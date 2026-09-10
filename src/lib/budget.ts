@@ -1,4 +1,11 @@
-import type { AppData, Budget, Expense, FixedExpense, Settings } from '../types';
+import type {
+  AppData,
+  Budget,
+  Expense,
+  FixedExpense,
+  FixedIncome,
+  Settings,
+} from '../types';
 import { monthOf } from './date';
 
 // ============================================================================
@@ -7,7 +14,7 @@ import { monthOf } from './date';
 // このアプリでいちばん大事な数字「今月あといくら使えるか」を出す。
 //
 // 予算の決め方は 2 通り:
-//   auto   : 手取り - 有効な固定費合計  (例: 250,000 - 170,000 = 80,000)
+//   auto   : 固定収入合計 - 固定費合計  (例: 250,000 - 170,000 = 80,000)
 //   manual : ユーザーが直接指定した金額
 // どちらの場合も、その月だけ上書きしたい場合は Budget レコードが最優先。
 //
@@ -16,10 +23,14 @@ import { monthOf } from './date';
 // 家賃をここから引くと二重に引くことになるため。
 // ============================================================================
 
-/** 固定費 1 件の「1ヶ月あたり」の金額。毎週◯円は月換算する */
+/** 毎週◯円 → 1ヶ月あたりに換算（×52/12） */
+function toMonthly(amount: number, freq: 'monthly' | 'weekly'): number {
+  return freq === 'weekly' ? Math.round((amount * 52) / 12) : amount;
+}
+
+/** 固定費 1 件の「1ヶ月あたり」の金額 */
 export function monthlyAmountOf(f: Pick<FixedExpense, 'amount' | 'freq'>): number {
-  if (f.freq === 'weekly') return Math.round((f.amount * 52) / 12);
-  return f.amount;
+  return toMonthly(f.amount, f.freq);
 }
 
 /** 有効な固定費の月換算合計 */
@@ -29,18 +40,29 @@ export function totalFixedExpenses(fixedExpenses: FixedExpense[]): number {
     .reduce((sum, f) => sum + monthlyAmountOf(f), 0);
 }
 
+/** 有効な固定収入の月換算合計 */
+export function totalFixedIncomes(fixedIncomes: FixedIncome[]): number {
+  return fixedIncomes
+    .filter((i) => i.active)
+    .reduce((sum, i) => sum + toMonthly(i.amount, i.freq), 0);
+}
+
 /** 指定月の予算額を求める */
 export function getBudgetForMonth(
   month: string,
   settings: Settings,
   budgets: Budget[],
   fixedExpenses: FixedExpense[],
+  fixedIncomes: FixedIncome[],
 ): number {
   const override = budgets.find((b) => b.month === month);
   if (override) return override.amount;
 
   if (settings.budgetMode === 'auto') {
-    return Math.max(0, settings.income - totalFixedExpenses(fixedExpenses));
+    return Math.max(
+      0,
+      totalFixedIncomes(fixedIncomes) - totalFixedExpenses(fixedExpenses),
+    );
   }
   return settings.defaultBudget;
 }
@@ -97,7 +119,13 @@ export interface MonthSummary {
 /** 指定月のサマリを作る。ダッシュボード・分析・履歴すべてがこれを使う */
 export function summarizeMonth(data: AppData, month: string): MonthSummary {
   const list = expensesInMonth(data.expenses, month);
-  const budget = getBudgetForMonth(month, data.settings, data.budgets, data.fixedExpenses);
+  const budget = getBudgetForMonth(
+    month,
+    data.settings,
+    data.budgets,
+    data.fixedExpenses,
+    data.fixedIncomes,
+  );
 
   let spent = 0;
   let fixedSpent = 0;

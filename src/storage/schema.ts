@@ -1,7 +1,7 @@
 import type { AppData, Category, FixedExpense, FixedIncome } from '../types';
 
 /** スキーマ変更時にインクリメントし、migrate() に変換処理を足す */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 // 明るめのパレット。ドーナツグラフと並べたときに互いに区別できる色を選ぶ
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -34,7 +34,6 @@ export function createEmptyData(): AppData {
     fixedExpenses: [],
     fixedIncomes: [],
     settings: {
-      income: 0,
       budgetMode: 'manual',
       defaultBudget: 80000,
       alerts: { at70: true, at90: true, at100: true },
@@ -51,12 +50,28 @@ export function migrate(raw: unknown): AppData {
   if (!raw || typeof raw !== 'object') return base;
 
   const d = raw as Partial<AppData>;
+  const legacySettings = (d.settings ?? {}) as Partial<AppData['settings']> & { income?: number };
 
   // v1 → v2: 固定費に周期(freq)が無ければ「毎月」。固定収入テーブルを新設
   const fixedExpenses: FixedExpense[] = Array.isArray(d.fixedExpenses)
     ? d.fixedExpenses.map((f) => ({ ...f, freq: f.freq ?? 'monthly' }))
     : [];
   const fixedIncomes: FixedIncome[] = Array.isArray(d.fixedIncomes) ? d.fixedIncomes : [];
+
+  // v2 → v3: 旧「手取り月収」(settings.income) を「給料」1件の固定収入に移す。
+  // 予算モード auto の意味が「手取り − 固定費」→「固定収入 − 固定費」に変わったため、
+  // これで移行前の予算額が保たれる。
+  const legacyIncome = legacySettings.income ?? 0;
+  if (legacyIncome > 0 && fixedIncomes.length === 0) {
+    fixedIncomes.push({
+      id: 'inc_salary',
+      name: '給料',
+      amount: legacyIncome,
+      freq: 'monthly',
+      paymentDay: 25,
+      active: true,
+    });
+  }
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -67,11 +82,13 @@ export function migrate(raw: unknown): AppData {
     budgets: Array.isArray(d.budgets) ? d.budgets : [],
     fixedExpenses,
     fixedIncomes,
+    // income は廃止したので明示的に取り込まない（他フィールドだけ拾う）
     settings: {
-      ...base.settings,
-      ...(d.settings ?? {}),
-      // alerts は後から足したフィールドなので、古いデータでも既定値で補う
-      alerts: { ...base.settings.alerts, ...(d.settings?.alerts ?? {}) },
+      budgetMode: legacySettings.budgetMode ?? base.settings.budgetMode,
+      defaultBudget: legacySettings.defaultBudget ?? base.settings.defaultBudget,
+      alerts: { ...base.settings.alerts, ...(legacySettings.alerts ?? {}) },
+      lastPaymentMethod: legacySettings.lastPaymentMethod,
+      lastCreditCardId: legacySettings.lastCreditCardId,
     },
   };
 }

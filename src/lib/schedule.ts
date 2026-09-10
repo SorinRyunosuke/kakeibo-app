@@ -1,7 +1,10 @@
-import type { AppData, FixedExpense, FixedIncome } from '../types';
+import type { AppData, FixedExpense } from '../types';
 import { END_OF_MONTH, WEEKDAYS_JA } from '../types';
 import { daysInMonth, localDate, monthOf, resolveDayInMonth, toISODate } from './date';
 import { summarizeCards } from './creditCard';
+
+// 予算計算と共有する（固定収入の月換算合計）
+export { totalFixedIncomes } from './budget';
 
 // ============================================================================
 // スケジュール算出
@@ -140,14 +143,4 @@ export function scheduleTotals(events: ScheduleEvent[]): {
     else outgoing += e.amount;
   }
   return { outgoing, incoming };
-}
-
-/** 1ヶ月あたりの固定収入合計（毎週◯円は月換算）。予算には使わない参考値 */
-export function totalFixedIncomes(fixedIncomes: FixedIncome[]): number {
-  return fixedIncomes
-    .filter((i) => i.active)
-    .reduce(
-      (sum, i) => sum + (i.freq === 'weekly' ? Math.round((i.amount * 52) / 12) : i.amount),
-      0,
-    );
 }

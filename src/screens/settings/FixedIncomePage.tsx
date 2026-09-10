@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext';
-import { totalFixedIncomes } from '../../lib/schedule';
+import { totalFixedIncomes } from '../../lib/budget';
 import { yen } from '../../lib/format';
 import { AppBar, Empty, Segmented, Sheet, Toggle } from '../../components/ui';
 import { IconEdit, IconPlus, IconTrash } from '../../components/icons';
@@ -10,8 +10,8 @@ import { describeRecurrence } from './FixedExpensePage';
 // ============================================================================
 // 固定収入（給料・バイト代など）
 //
-// カレンダーの「入金予定」表示にのみ使う。予算計算には影響しない
-// （手取りは「予算設定」の入力のまま）。
+// - 予算モードが「固定収入から自動」のとき、この合計から固定費を引いた額が予算になる
+// - 「分析 → カレンダー」の入金予定にも表示される
 // ============================================================================
 
 const DAY_OPTIONS = [...Array.from({ length: 28 }, (_, i) => i + 1), END_OF_MONTH];
@@ -27,12 +27,13 @@ export function FixedIncomePage({ onBack }: { onBack: () => void }) {
       <AppBar title="固定収入" onBack={onBack} />
 
       <div className="card">
-        <p className="tiny faint">月換算の固定収入 合計（参考）</p>
+        <p className="tiny faint">月換算の固定収入 合計</p>
         <p style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--primary)' }}>
           {yen(total)}
         </p>
         <p className="hint">
-          予算計算には影響しません。「分析 → カレンダー」で入金予定として表示するためのものです。
+          予算モードが「固定収入から自動」のとき、この合計から固定費を引いた額が「自由に使えるお金」になります。
+          カレンダーの入金予定にも表示されます。
         </p>
       </div>
 

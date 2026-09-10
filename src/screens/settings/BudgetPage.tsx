@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext';
-import { getBudgetForMonth, summarizeMonth, totalFixedExpenses } from '../../lib/budget';
+import {
+  getBudgetForMonth,
+  summarizeMonth,
+  totalFixedExpenses,
+  totalFixedIncomes,
+} from '../../lib/budget';
 import { formatMonthLabel, toMonthKey } from '../../lib/date';
 import { percent, yen } from '../../lib/format';
 import { AppBar, Section, Segmented, Sheet, Toggle } from '../../components/ui';
@@ -9,7 +14,7 @@ import type { BudgetMode } from '../../types';
 
 // ============================================================================
 // 予算設定
-//   auto   : 手取り − 固定費 = 自由に使えるお金（推奨）
+//   auto   : 固定収入合計 − 固定費合計 = 自由に使えるお金（推奨）
 //   manual : 金額を直接指定
 // さらに「今月だけ上書き」も持てるようにする（臨時出費のある月向け）
 // ============================================================================
@@ -21,7 +26,14 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
 
   const summary = summarizeMonth(data, month);
   const fixedTotal = totalFixedExpenses(data.fixedExpenses);
-  const budget = getBudgetForMonth(month, data.settings, data.budgets, data.fixedExpenses);
+  const incomeTotal = totalFixedIncomes(data.fixedIncomes);
+  const budget = getBudgetForMonth(
+    month,
+    data.settings,
+    data.budgets,
+    data.fixedExpenses,
+    data.fixedIncomes,
+  );
   const alerts = data.settings.alerts;
 
   return (
@@ -59,7 +71,7 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
               <span className="small">自由に使える金額</span>
               {data.settings.budgetMode === 'auto' && (
                 <p className="tiny faint">
-                  （手取り {yen(data.settings.income)} − 固定費 {yen(fixedTotal)}）
+                  （固定収入 {yen(incomeTotal)} − 固定費 {yen(fixedTotal)}）
                 </p>
               )}
             </div>
@@ -153,12 +165,11 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
     onSaved: () => void;
   }) {
     const [mode, setMode] = useState<BudgetMode>(data.settings.budgetMode);
-    const [income, setIncome] = useState(String(data.settings.income || ''));
     const [defaultBudget, setDefaultBudget] = useState(String(data.settings.defaultBudget || ''));
     const monthOverride = data.budgets.find((b) => b.month === month);
     const [override, setOverride] = useState(String(monthOverride?.amount ?? ''));
 
-    const autoBudget = Math.max(0, (Number(income) || 0) - fixedTotal);
+    const autoBudget = Math.max(0, incomeTotal - fixedTotal);
     const effective =
       override.trim() !== ''
         ? Number(override) || 0
@@ -169,7 +180,6 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
     const save = () => {
       updateSettings({
         budgetMode: mode,
-        income: Number(income) || 0,
         defaultBudget: Number(defaultBudget) || 0,
       });
       setBudgetForMonth(month, override.trim() === '' ? null : Number(override) || 0);
@@ -197,7 +207,7 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
           <label className="field-label">決め方</label>
           <Segmented
             options={[
-              { value: 'auto', label: '手取りから自動' },
+              { value: 'auto', label: '固定収入から自動' },
               { value: 'manual', label: '金額を指定' },
             ]}
             value={mode}
@@ -207,21 +217,12 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
 
         {mode === 'auto' ? (
           <>
-            <div className="field">
-              <label className="field-label">手取り月収</label>
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                value={income}
-                onChange={(e) => setIncome(e.target.value)}
-                placeholder="250000"
-              />
-            </div>
             <div className="card">
               <div className="row-between small">
-                <span className="muted">手取り</span>
-                <b>{yen(Number(income) || 0)}</b>
+                <span className="muted">
+                  固定収入（{data.fixedIncomes.filter((i) => i.active).length}件）
+                </span>
+                <b style={{ color: 'var(--primary)' }}>{yen(incomeTotal)}</b>
               </div>
               <div className="row-between small mt-8">
                 <span className="muted">
@@ -236,8 +237,9 @@ export function BudgetPage({ onBack }: { onBack: () => void }) {
               </div>
             </div>
             <p className="hint">
-              固定費は「その他 &gt; 固定費」で登録します。ここで差し引いているため、
-              固定費として登録した支出が「あと使える金額」から二重に引かれることはありません。
+              固定収入は「その他 &gt; 固定収入」、固定費は「その他 &gt; 固定費」で登録します。
+              固定費はここで差し引いているため、固定費の支払いが「あと使える金額」から
+              二重に引かれることはありません。
             </p>
           </>
         ) : (

@@ -93,8 +93,8 @@ export interface FixedExpense {
 
 /**
  * 固定収入（給料・バイト代など）。
- * カレンダーの「入金予定」表示にのみ使う。予算計算には関与しない
- * （手取りは Settings.income のまま）。
+ * - 予算モードが 'auto' のとき「固定収入合計 − 固定費合計 = 自由に使えるお金」
+ * - カレンダーの「入金予定」表示にも使う
  */
 export interface FixedIncome {
   id: string;
@@ -119,12 +119,10 @@ export interface AlertSettings {
 }
 
 export interface Settings {
-  /** 手取り月収 */
-  income: number;
   /** 使用率がしきい値を超えたときにダッシュボードで知らせる */
   alerts: AlertSettings;
   /**
-   * auto   : 予算 = 手取り - 有効な固定費合計
+   * auto   : 予算 = 有効な固定収入合計 - 有効な固定費合計
    * manual : 予算 = defaultBudget (月ごとの Budget があればそちらが優先)
    */
   budgetMode: BudgetMode;

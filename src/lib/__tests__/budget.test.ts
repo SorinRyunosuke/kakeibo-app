@@ -6,7 +6,6 @@ import type { AppData, Expense } from '../../types';
 function dataWith(spend: number[], budget = 80000): AppData {
   const data = createEmptyData();
   data.settings = {
-    income: 0,
     budgetMode: 'manual',
     defaultBudget: budget,
     alerts: { at70: true, at90: true, at100: true },
@@ -66,10 +65,19 @@ describe('ケース1-3: 今月あと使える金額', () => {
   });
 });
 
-describe('予算モード auto: 手取り - 固定費', () => {
-  it('手取り250,000 / 固定費170,000 -> 予算80,000', () => {
+describe('予算モード auto: 固定収入 - 固定費', () => {
+  const autoSettings = {
+    budgetMode: 'auto' as const,
+    defaultBudget: 0,
+    alerts: { at70: true, at90: true, at100: true },
+  };
+
+  it('固定収入250,000 / 固定費170,000 -> 予算80,000', () => {
     const data = createEmptyData();
-    data.settings = { income: 250000, budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
+    data.settings = autoSettings;
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
     data.fixedExpenses = [
       { id: 'f1', name: '家賃', amount: 120000, categoryId: 'cat_rent', freq: 'monthly', paymentDay: 27, paymentMethod: 'bank', active: true },
       { id: 'f2', name: '携帯', amount: 8000, categoryId: 'cat_comm', freq: 'monthly', paymentDay: 10, paymentMethod: 'credit', active: true },
@@ -79,24 +87,26 @@ describe('予算モード auto: 手取り - 固定費', () => {
     expect(summarizeMonth(data, '2026-09').budget).toBe(80000);
   });
 
-  it('毎週の固定費は月換算（×52/12）で予算から引かれる', () => {
+  it('毎週の固定収入・固定費はどちらも月換算（×52/12）される', () => {
     const data = createEmptyData();
-    data.settings = {
-      income: 300000,
-      budgetMode: 'auto',
-      defaultBudget: 0,
-      alerts: { at70: true, at90: true, at100: true },
-    };
+    data.settings = autoSettings;
+    // 毎週70,000円 → 月 303,333円
+    data.fixedIncomes = [
+      { id: 'i1', name: 'バイト', amount: 70000, freq: 'weekly', paymentDay: 1, weekday: 5, active: true },
+    ];
     // 毎週3,000円 → 月 13,000円（3000 * 52 / 12 = 13000）
     data.fixedExpenses = [
       { id: 'w1', name: '習い事', amount: 3000, categoryId: 'cat_hobby', freq: 'weekly', paymentDay: 1, weekday: 2, paymentMethod: 'cash', active: true },
     ];
-    expect(summarizeMonth(data, '2026-09').budget).toBe(300000 - 13000);
+    expect(summarizeMonth(data, '2026-09').budget).toBe(Math.round((70000 * 52) / 12) - 13000);
   });
 
   it('固定費由来の支出は「あと使える金額」から引かれない (二重計上の防止)', () => {
     const data = createEmptyData();
-    data.settings = { income: 250000, budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
+    data.settings = autoSettings;
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
     data.fixedExpenses = [
       { id: 'f1', name: '家賃', amount: 170000, categoryId: 'cat_rent', freq: 'monthly', paymentDay: 27, paymentMethod: 'bank', active: true },
     ];

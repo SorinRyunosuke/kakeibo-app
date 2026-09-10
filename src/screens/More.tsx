@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useAuth } from '../store/AuthContext';
-import { getBudgetForMonth, totalFixedExpenses } from '../lib/budget';
-import { totalFixedIncomes } from '../lib/schedule';
+import { getBudgetForMonth, totalFixedExpenses, totalFixedIncomes } from '../lib/budget';
 import { checkPasswordStrength } from '../lib/auth';
 import { toMonthKey } from '../lib/date';
 import { yen } from '../lib/format';
@@ -43,8 +42,15 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
   const month = toMonthKey(new Date());
 
   const budget = useMemo(
-    () => getBudgetForMonth(month, data.settings, data.budgets, data.fixedExpenses),
-    [month, data.settings, data.budgets, data.fixedExpenses],
+    () =>
+      getBudgetForMonth(
+        month,
+        data.settings,
+        data.budgets,
+        data.fixedExpenses,
+        data.fixedIncomes,
+      ),
+    [month, data.settings, data.budgets, data.fixedExpenses, data.fixedIncomes],
   );
   const fixedTotal = totalFixedExpenses(data.fixedExpenses);
   const incomeTotal = totalFixedIncomes(data.fixedIncomes);
@@ -58,7 +64,7 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
       title: '予算設定',
       sub:
         data.settings.budgetMode === 'auto'
-          ? `手取り ${yen(data.settings.income)} − 固定費 ${yen(fixedTotal)}`
+          ? `固定収入 ${yen(incomeTotal)} − 固定費 ${yen(fixedTotal)}`
           : '毎月の自由に使える金額を指定',
       value: yen(budget),
     },

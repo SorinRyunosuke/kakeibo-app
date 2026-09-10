@@ -5,7 +5,10 @@ import { END_OF_MONTH, type AppData } from '../../types';
 
 function sampleData(): AppData {
   const d = createEmptyData();
-  d.settings = { income: 250000, budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
+  d.settings = { budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
+  d.fixedIncomes = [
+    { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+  ];
   d.creditCards = [
     {
       id: 'card1',
@@ -70,10 +73,32 @@ describe('JSONバックアップ', () => {
   it('壊れた／古いデータでも既定値で起動できる', () => {
     expect(migrate(null).categories.length).toBeGreaterThan(0);
     expect(migrate({ expenses: 'これは配列ではない' }).expenses).toEqual([]);
-    // 未知のフィールドがあっても設定は既定値とマージされる
-    const partial = migrate({ settings: { income: 300000 } });
-    expect(partial.settings.income).toBe(300000);
-    expect(partial.settings.budgetMode).toBe('manual');
+    // 一部だけ持つ設定は既定値とマージされる
+    const partial = migrate({ settings: { budgetMode: 'auto' } });
+    expect(partial.settings.budgetMode).toBe('auto');
+    expect(partial.settings.defaultBudget).toBe(80000);
+  });
+
+  it('v2以前の手取り月収(settings.income)は「給料」の固定収入に移行される', () => {
+    const migrated = migrate({
+      schemaVersion: 2,
+      settings: { income: 240000, budgetMode: 'auto' },
+    });
+    expect(migrated.settings).not.toHaveProperty('income');
+    expect(migrated.fixedIncomes).toEqual([
+      { id: 'inc_salary', name: '給料', amount: 240000, freq: 'monthly', paymentDay: 25, active: true },
+    ]);
+  });
+
+  it('固定収入がすでにあれば手取りからの移行はしない', () => {
+    const migrated = migrate({
+      settings: { income: 240000 },
+      fixedIncomes: [
+        { id: 'x', name: '既存', amount: 100000, freq: 'monthly', paymentDay: 10, active: true },
+      ],
+    });
+    expect(migrated.fixedIncomes).toHaveLength(1);
+    expect(migrated.fixedIncomes[0].id).toBe('x');
   });
 });
 
