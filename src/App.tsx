@@ -13,6 +13,7 @@ import { BudgetPage } from './screens/settings/BudgetPage';
 import { CardPage } from './screens/settings/CardPage';
 import { CategoryPage } from './screens/settings/CategoryPage';
 import { FixedExpensePage } from './screens/settings/FixedExpensePage';
+import { FixedIncomePage } from './screens/settings/FixedIncomePage';
 import { BackupPage } from './screens/settings/BackupPage';
 import { IconChart, IconDots, IconHome, IconPlus, IconReceipt } from './components/icons';
 import { BackGuard } from './lib/useBackClose';
@@ -149,6 +150,8 @@ function SubPage({
       return <BudgetPage onBack={onBack} />;
     case 'fixed':
       return <FixedExpensePage onBack={onBack} />;
+    case 'income':
+      return <FixedIncomePage onBack={onBack} />;
     case 'cards':
       return (
         <CardPage onBack={onBack} onOpenDetail={(card) => onPush({ name: 'cardDetail', card })} />

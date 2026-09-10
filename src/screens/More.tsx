@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useAuth } from '../store/AuthContext';
 import { getBudgetForMonth, totalFixedExpenses } from '../lib/budget';
+import { totalFixedIncomes } from '../lib/schedule';
 import { checkPasswordStrength } from '../lib/auth';
 import { toMonthKey } from '../lib/date';
 import { yen } from '../lib/format';
@@ -19,13 +20,21 @@ import {
   IconTag,
   IconTarget,
   IconUser,
+  IconWallet,
 } from '../components/icons';
 
 // ============================================================================
 // 「その他」タブ。設定と、頻繁には開かない画面への入り口をまとめる。
 // ============================================================================
 
-export type MorePage = 'budget' | 'fixed' | 'cards' | 'categories' | 'history' | 'backup';
+export type MorePage =
+  | 'budget'
+  | 'fixed'
+  | 'income'
+  | 'cards'
+  | 'categories'
+  | 'history'
+  | 'backup';
 
 export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
   const { data } = useApp();
@@ -38,6 +47,7 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
     [month, data.settings, data.budgets, data.fixedExpenses],
   );
   const fixedTotal = totalFixedExpenses(data.fixedExpenses);
+  const incomeTotal = totalFixedIncomes(data.fixedIncomes);
   const activeCards = data.creditCards.filter((c) => !c.archived);
 
   const money: Row[] = [
@@ -62,6 +72,17 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
           ? '家賃・サブスクなどを登録'
           : `${data.fixedExpenses.filter((f) => f.active).length}件が有効`,
       value: yen(fixedTotal),
+    },
+    {
+      key: 'income',
+      icon: <IconWallet size={19} />,
+      color: 'var(--primary)',
+      title: '固定収入',
+      sub:
+        data.fixedIncomes.length === 0
+          ? '給料・バイト代など（カレンダー表示用）'
+          : `${data.fixedIncomes.filter((i) => i.active).length}件が有効`,
+      value: yen(incomeTotal),
     },
     {
       key: 'cards',

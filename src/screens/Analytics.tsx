@@ -2,19 +2,29 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { summarizeMonth } from '../lib/budget';
 import { summarizeCards, describeCardCycle } from '../lib/creditCard';
-import { addMonthsToKey, formatMonthLabel, formatShortDate, toMonthKey } from '../lib/date';
+import { eventsInMonth, scheduleTotals, type ScheduleEvent } from '../lib/schedule';
+import {
+  addMonthsToKey,
+  formatMonthLabel,
+  formatRelativeDate,
+  formatShortDate,
+  toMonthKey,
+} from '../lib/date';
 import { percent, yen } from '../lib/format';
 import { Delta, Donut, Empty, PageHead, PeriodBar, Section, Segmented } from '../components/ui';
+import { Calendar, KIND_COLOR } from '../components/Calendar';
 import { IconChevronRight } from '../components/icons';
 import { PAYMENT_METHODS, type CreditCard } from '../types';
 
 // ============================================================================
 // 支出分析。ダッシュボードより優先度は下げ、振り返りたいときに見る場所。
+// カレンダー（引き落とし・固定費・固定収入の予定）もここに統合している。
 // ============================================================================
 
-type Tab = 'summary' | 'category' | 'card';
+type Tab = 'calendar' | 'summary' | 'category' | 'card';
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'calendar', label: 'カレンダー' },
   { value: 'summary', label: 'サマリー' },
   { value: 'category', label: 'カテゴリ' },
   { value: 'card', label: 'カード' },
@@ -24,7 +34,15 @@ export function Analytics({ onOpenCard }: { onOpenCard: (card: CreditCard) => vo
   const { data } = useApp();
   const currentMonth = toMonthKey(new Date());
   const [month, setMonth] = useState(currentMonth);
-  const [tab, setTab] = useState<Tab>('summary');
+  const [tab, setTab] = useState<Tab>('calendar');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const goMonth = (m: string) => {
+    setMonth(m);
+    setSelectedDate(null);
+  };
+
+  const events = useMemo(() => eventsInMonth(data, month), [data, month]);
 
   const s = useMemo(() => summarizeMonth(data, month), [data, month]);
   const prev = useMemo(() => summarizeMonth(data, addMonthsToKey(month, -1)), [data, month]);
@@ -48,12 +66,22 @@ export function Analytics({ onOpenCard }: { onOpenCard: (card: CreditCard) => vo
 
       <PeriodBar
         label={formatMonthLabel(month)}
-        onPrev={() => setMonth(addMonthsToKey(month, -1))}
-        onNext={() => setMonth(addMonthsToKey(month, 1))}
-        nextDisabled={month >= currentMonth}
+        onPrev={() => goMonth(addMonthsToKey(month, -1))}
+        onNext={() => goMonth(addMonthsToKey(month, 1))}
+        nextDisabled={tab !== 'calendar' && month >= currentMonth}
       />
 
       <Segmented options={TABS} value={tab} onChange={setTab} />
+
+      {/* ---------- カレンダー ---------- */}
+      {tab === 'calendar' && (
+        <CalendarTab
+          month={month}
+          events={events}
+          selectedDate={selectedDate}
+          onSelectDate={(d) => setSelectedDate((cur) => (cur === d ? null : d))}
+        />
+      )}
 
       {/* ---------- サマリー ---------- */}
       {tab === 'summary' && (
@@ -282,6 +310,119 @@ export function Analytics({ onOpenCard }: { onOpenCard: (card: CreditCard) => vo
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** 「カレンダー」タブの中身 */
+function CalendarTab({
+  month,
+  events,
+  selectedDate,
+  onSelectDate,
+}: {
+  month: string;
+  events: ScheduleEvent[];
+  selectedDate: string | null;
+  onSelectDate: (date: string) => void;
+}) {
+  const totals = scheduleTotals(events);
+
+  const shown = selectedDate ? events.filter((e) => e.date === selectedDate) : events;
+
+  const kindMeta: Record<ScheduleEvent['kind'], { icon: string; label: string }> = {
+    card: { icon: '💳', label: 'カード引き落とし' },
+    expense: { icon: '🔁', label: '固定費' },
+    income: { icon: '💰', label: '固定収入' },
+  };
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div className="stat-grid" style={{ marginTop: 0 }}>
+        <div className="stat-card">
+          <p className="stat-label">今月の引き落とし予定</p>
+          <p className="stat-value">{yen(totals.outgoing)}</p>
+        </div>
+        <div className="stat-card">
+          <p className="stat-label">今月の入金予定</p>
+          <p className="stat-value" style={{ color: 'var(--primary)' }}>
+            {yen(totals.incoming)}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <Calendar
+          month={month}
+          events={events}
+          selected={selectedDate}
+          onSelect={onSelectDate}
+        />
+        <div className="cal-legend">
+          <span>
+            <i style={{ background: KIND_COLOR.card }} />
+            カード
+          </span>
+          <span>
+            <i style={{ background: KIND_COLOR.expense }} />
+            固定費
+          </span>
+          <span>
+            <i style={{ background: KIND_COLOR.income }} />
+            固定収入
+          </span>
+        </div>
+      </div>
+
+      <Section
+        title={
+          selectedDate
+            ? `${formatShortDate(selectedDate)} の予定`
+            : `${formatMonthLabel(month)} の予定`
+        }
+      >
+        {shown.length === 0 ? (
+          <div className="card">
+            <Empty icon="🗓">
+              {selectedDate ? 'この日の予定はありません。' : '予定はありません。'}
+              <br />
+              固定費・固定収入は「その他」タブから登録できます。
+            </Empty>
+          </div>
+        ) : (
+          <div className="list">
+            {shown.map((e, i) => {
+              const meta = kindMeta[e.kind];
+              return (
+                <div className="list-row" key={`${e.sourceId}-${e.date}-${i}`}>
+                  <span
+                    className="tile"
+                    style={{
+                      background: `color-mix(in srgb, ${KIND_COLOR[e.kind]} 16%, #fff)`,
+                    }}
+                  >
+                    {meta.icon}
+                  </span>
+                  <span className="list-row-main">
+                    <span className="list-row-title">{e.label}</span>
+                    <span className="list-row-sub">
+                      {selectedDate ? meta.label : formatRelativeDate(e.date)}
+                      {e.note ? ` · ${e.note}` : ''}
+                    </span>
+                  </span>
+                  <span
+                    className="list-row-value"
+                    style={{ color: e.kind === 'income' ? 'var(--primary)' : undefined }}
+                  >
+                    {e.kind === 'income' ? '+' : ''}
+                    {yen(e.amount)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }

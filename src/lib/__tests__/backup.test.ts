@@ -22,6 +22,7 @@ function sampleData(): AppData {
       name: '家賃',
       amount: 120000,
       categoryId: 'cat_rent',
+      freq: 'monthly',
       paymentDay: 27,
       paymentMethod: 'bank',
       active: true,

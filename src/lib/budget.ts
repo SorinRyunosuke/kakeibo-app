@@ -16,9 +16,17 @@ import { monthOf } from './date';
 // 家賃をここから引くと二重に引くことになるため。
 // ============================================================================
 
-/** 有効な固定費の合計 */
+/** 固定費 1 件の「1ヶ月あたり」の金額。毎週◯円は月換算する */
+export function monthlyAmountOf(f: Pick<FixedExpense, 'amount' | 'freq'>): number {
+  if (f.freq === 'weekly') return Math.round((f.amount * 52) / 12);
+  return f.amount;
+}
+
+/** 有効な固定費の月換算合計 */
 export function totalFixedExpenses(fixedExpenses: FixedExpense[]): number {
-  return fixedExpenses.filter((f) => f.active).reduce((sum, f) => sum + f.amount, 0);
+  return fixedExpenses
+    .filter((f) => f.active)
+    .reduce((sum, f) => sum + monthlyAmountOf(f), 0);
 }
 
 /** 指定月の予算額を求める */

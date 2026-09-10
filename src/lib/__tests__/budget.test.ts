@@ -71,19 +71,34 @@ describe('予算モード auto: 手取り - 固定費', () => {
     const data = createEmptyData();
     data.settings = { income: 250000, budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
     data.fixedExpenses = [
-      { id: 'f1', name: '家賃', amount: 120000, categoryId: 'cat_rent', paymentDay: 27, paymentMethod: 'bank', active: true },
-      { id: 'f2', name: '携帯', amount: 8000, categoryId: 'cat_comm', paymentDay: 10, paymentMethod: 'credit', active: true },
-      { id: 'f3', name: '光熱費', amount: 42000, categoryId: 'cat_utility', paymentDay: 5, paymentMethod: 'bank', active: true },
-      { id: 'f4', name: '解約済サブスク', amount: 50000, categoryId: 'cat_subsc', paymentDay: 1, paymentMethod: 'credit', active: false },
+      { id: 'f1', name: '家賃', amount: 120000, categoryId: 'cat_rent', freq: 'monthly', paymentDay: 27, paymentMethod: 'bank', active: true },
+      { id: 'f2', name: '携帯', amount: 8000, categoryId: 'cat_comm', freq: 'monthly', paymentDay: 10, paymentMethod: 'credit', active: true },
+      { id: 'f3', name: '光熱費', amount: 42000, categoryId: 'cat_utility', freq: 'monthly', paymentDay: 5, paymentMethod: 'bank', active: true },
+      { id: 'f4', name: '解約済サブスク', amount: 50000, categoryId: 'cat_subsc', freq: 'monthly', paymentDay: 1, paymentMethod: 'credit', active: false },
     ];
     expect(summarizeMonth(data, '2026-09').budget).toBe(80000);
+  });
+
+  it('毎週の固定費は月換算（×52/12）で予算から引かれる', () => {
+    const data = createEmptyData();
+    data.settings = {
+      income: 300000,
+      budgetMode: 'auto',
+      defaultBudget: 0,
+      alerts: { at70: true, at90: true, at100: true },
+    };
+    // 毎週3,000円 → 月 13,000円（3000 * 52 / 12 = 13000）
+    data.fixedExpenses = [
+      { id: 'w1', name: '習い事', amount: 3000, categoryId: 'cat_hobby', freq: 'weekly', paymentDay: 1, weekday: 2, paymentMethod: 'cash', active: true },
+    ];
+    expect(summarizeMonth(data, '2026-09').budget).toBe(300000 - 13000);
   });
 
   it('固定費由来の支出は「あと使える金額」から引かれない (二重計上の防止)', () => {
     const data = createEmptyData();
     data.settings = { income: 250000, budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
     data.fixedExpenses = [
-      { id: 'f1', name: '家賃', amount: 170000, categoryId: 'cat_rent', paymentDay: 27, paymentMethod: 'bank', active: true },
+      { id: 'f1', name: '家賃', amount: 170000, categoryId: 'cat_rent', freq: 'monthly', paymentDay: 27, paymentMethod: 'bank', active: true },
     ];
     data.expenses = [
       { id: 'e1', amount: 170000, date: '2026-09-27', categoryId: 'cat_rent', paymentMethod: 'bank', fixedExpenseId: 'f1', createdAt: '' },

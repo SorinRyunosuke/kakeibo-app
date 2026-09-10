@@ -15,6 +15,7 @@ import type {
   CreditCard,
   Expense,
   FixedExpense,
+  FixedIncome,
   Settings,
 } from '../types';
 import { createId } from '../lib/id';
@@ -52,6 +53,10 @@ interface AppContextValue {
   addFixedExpense: (input: Omit<FixedExpense, 'id'>) => void;
   updateFixedExpense: (id: string, patch: Partial<FixedExpense>) => void;
   deleteFixedExpense: (id: string) => void;
+
+  addFixedIncome: (input: Omit<FixedIncome, 'id'>) => void;
+  updateFixedIncome: (id: string, patch: Partial<FixedIncome>) => void;
+  deleteFixedIncome: (id: string) => void;
 
   updateSettings: (patch: Partial<Settings>) => void;
   setBudgetForMonth: (month: string, amount: number | null) => void;
@@ -213,6 +218,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       deleteFixedExpense: (id) =>
         patchData((d) => ({ ...d, fixedExpenses: d.fixedExpenses.filter((f) => f.id !== id) })),
+
+      // --- 固定収入 -----------------------------------------------------
+      addFixedIncome: (input) =>
+        patchData((d) => ({
+          ...d,
+          fixedIncomes: [...d.fixedIncomes, { ...input, id: createId('inc') }],
+        })),
+
+      updateFixedIncome: (id, patch) =>
+        patchData((d) => ({
+          ...d,
+          fixedIncomes: d.fixedIncomes.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+        })),
+
+      deleteFixedIncome: (id) =>
+        patchData((d) => ({ ...d, fixedIncomes: d.fixedIncomes.filter((i) => i.id !== id) })),
 
       // --- 設定・予算 -----------------------------------------------------
       updateSettings: (patch) =>

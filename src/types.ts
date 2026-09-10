@@ -69,16 +69,42 @@ export interface Budget {
   amount: number;
 }
 
+/** 繰り返しの周期 */
+export type RecurrenceFreq = 'monthly' | 'weekly';
+
+export const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
 /** 固定費 */
 export interface FixedExpense {
   id: string;
   name: string;
   amount: number;
   categoryId: string;
-  /** 支払日 1-28 または END_OF_MONTH */
+  /** monthly = 毎月◯日 / weekly = 毎週◯曜。既存データは 'monthly' */
+  freq: RecurrenceFreq;
+  /** freq === 'monthly' のとき。支払日 1-28 または END_OF_MONTH */
   paymentDay: number;
+  /** freq === 'weekly' のとき。0=日 .. 6=土 */
+  weekday?: number;
   paymentMethod: PaymentMethod;
   creditCardId?: string;
+  active: boolean;
+}
+
+/**
+ * 固定収入（給料・バイト代など）。
+ * カレンダーの「入金予定」表示にのみ使う。予算計算には関与しない
+ * （手取りは Settings.income のまま）。
+ */
+export interface FixedIncome {
+  id: string;
+  name: string;
+  amount: number;
+  freq: RecurrenceFreq;
+  /** freq === 'monthly' のとき。1-28 または END_OF_MONTH */
+  paymentDay: number;
+  /** freq === 'weekly' のとき。0=日 .. 6=土 */
+  weekday?: number;
   active: boolean;
 }
 
@@ -117,5 +143,6 @@ export interface AppData {
   categories: Category[];
   budgets: Budget[];
   fixedExpenses: FixedExpense[];
+  fixedIncomes: FixedIncome[];
   settings: Settings;
 }

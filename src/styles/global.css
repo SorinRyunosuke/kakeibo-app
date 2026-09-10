@@ -1319,3 +1319,119 @@ svg {
   color: var(--text-faint);
   text-align: center;
 }
+
+/* --- カレンダー ---------------------------------------------------------- */
+
+.cal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+}
+
+.cal-head,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-hcell {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 4px 0 6px;
+}
+
+.cal-hcell.sun {
+  color: #e8544d;
+}
+
+.cal-hcell.sat {
+  color: #3f7fd8;
+}
+
+.cal-grid {
+  gap: 2px;
+}
+
+.cal-cell {
+  aspect-ratio: 1 / 1;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 4px;
+  gap: 3px;
+  background: none;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.cal-cell.empty {
+  pointer-events: none;
+}
+
+.cal-cell.today {
+  border-color: var(--primary);
+}
+
+.cal-cell.sel {
+  background: var(--primary-soft);
+}
+
+.cal-cell:active:not(.empty) {
+  background: var(--surface-2);
+}
+
+.cal-day {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day.sun {
+  color: #e8544d;
+}
+
+.cal-day.sat {
+  color: #3f7fd8;
+}
+
+.cal-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+/* カレンダー凡例 */
+.cal-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}

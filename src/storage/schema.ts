@@ -1,7 +1,7 @@
-import type { AppData, Category } from '../types';
+import type { AppData, Category, FixedExpense, FixedIncome } from '../types';
 
 /** スキーマ変更時にインクリメントし、migrate() に変換処理を足す */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // 明るめのパレット。ドーナツグラフと並べたときに互いに区別できる色を選ぶ
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -32,6 +32,7 @@ export function createEmptyData(): AppData {
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
     budgets: [],
     fixedExpenses: [],
+    fixedIncomes: [],
     settings: {
       income: 0,
       budgetMode: 'manual',
@@ -51,6 +52,12 @@ export function migrate(raw: unknown): AppData {
 
   const d = raw as Partial<AppData>;
 
+  // v1 → v2: 固定費に周期(freq)が無ければ「毎月」。固定収入テーブルを新設
+  const fixedExpenses: FixedExpense[] = Array.isArray(d.fixedExpenses)
+    ? d.fixedExpenses.map((f) => ({ ...f, freq: f.freq ?? 'monthly' }))
+    : [];
+  const fixedIncomes: FixedIncome[] = Array.isArray(d.fixedIncomes) ? d.fixedIncomes : [];
+
   return {
     schemaVersion: SCHEMA_VERSION,
     expenses: Array.isArray(d.expenses) ? d.expenses : [],
@@ -58,7 +65,8 @@ export function migrate(raw: unknown): AppData {
     categories:
       Array.isArray(d.categories) && d.categories.length > 0 ? d.categories : base.categories,
     budgets: Array.isArray(d.budgets) ? d.budgets : [],
-    fixedExpenses: Array.isArray(d.fixedExpenses) ? d.fixedExpenses : [],
+    fixedExpenses,
+    fixedIncomes,
     settings: {
       ...base.settings,
       ...(d.settings ?? {}),
