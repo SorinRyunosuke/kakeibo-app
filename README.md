@@ -41,8 +41,6 @@ npm run dev
 | `npm run zip` | ビルドして `kakeibo-site.zip` を作る（アップロード用） |
 | `npm run icons` | PWA用アイコン（PNG）を再生成 |
 | `npm run ocr:bundle` | レシートOCRのファイルを同梱（オフライン用・build に含まれる） |
-| `npm run android:open` | ビルドして Android Studio を開く |
-| `npm run android:apk` | APK ファイルを生成 |
 | `npm run lint` | oxlint |
 
 ---
@@ -151,71 +149,21 @@ HTTPS のURLをスマホの Chrome で開いたら、
 | **レシート撮影** | `capture="environment"` で背面カメラが直接起動 |
 | **インストール導線** | `beforeinstallprompt` を捕まえ、「その他」タブにインストールボタンを表示 |
 
-## ネイティブアプリ（APK）として使う
+## ネイティブアプリ（APK）について
 
-Capacitor で APK に包むと、**サーバーもURLも一切不要**になります。
-アプリのファイルがすべて APK の中に入るため、初回起動から完全にオフラインで動きます。
-レシートOCRの学習データも同梱してあるので、**通信は一度も発生しません**。
+このリポジトリは **Web / PWA 構成**です（Vercel などに HTTPS で公開し、Android の Chrome から「ホーム画面に追加」で使う）。
 
-### 事前に入れるもの
-
-| | 入手先 | 備考 |
-|---|---|---|
-| **JDK 17** | [Temurin](https://adoptium.net/) | Android Gradle Plugin 8系が要求 |
-| **Android Studio** | [公式](https://developer.android.com/studio) | SDK も一緒に入る。ビルドとインストールに使う |
-
-> Android Studio を入れると JDK も同梱されるので、実質 Android Studio だけで足ります。
-> 初回のダウンロードが数GBあるので、時間に余裕のあるときに。
-
-### ビルド手順
-
-Android Studio で開いてビルドするのがいちばん簡単です。
+以前は Capacitor で APK に包む構成も同梱していましたが、リポジトリを軽く保つため外しました。
+APK 化が必要になったら、`dist/` を包むだけなのでいつでも作り直せます。
 
 ```bash
-npm run android:open
+npm i -D @capacitor/cli @capacitor/core @capacitor/android
+npx cap init Kakeibo jp.kakeibo.app --web-dir dist
+npm run build && npx cap add android
+npx cap open android   # Android Studio でビルド／実機インストール
 ```
 
-Web をビルド → Android プロジェクトへ同期 → Android Studio が開きます。
-あとは Android Studio 側で、
-
-1. USB でスマホを接続（**開発者オプション → USBデバッグ** を有効にしておく）
-2. 上部の再生ボタン（▶）を押す
-
-これでスマホにインストールされ、そのまま起動します。
-
-#### APK ファイルだけ作る場合
-
-```bash
-npm run android:apk
-```
-
-生成先: `android/app/build/outputs/apk/debug/app-debug.apk`
-
-このファイルをスマホに転送し、タップしてインストールします
-（「提供元不明のアプリ」の許可を求められたら許可してください）。
-
-### コードを変更したとき
-
-```bash
-npm run android:sync
-```
-
-ビルドして APK 内のファイルを更新します。そのあと Android Studio で再度 ▶ を押してください。
-
-### 構成
-
-| | |
-|---|---|
-| アプリID | `jp.kakeibo.app` |
-| アプリ名 | Kakeibo |
-| 同梱サイズ | 約23MB（うちOCR関連が約20MB） |
-| Service Worker | ネイティブ実行時は登録しない（ファイルはAPK内にあるため不要。古いキャッシュで更新が反映されなくなる事故も防ぐ） |
-| データ保存 | WebView の localStorage。アプリのデータを消すと消えるので、バックアップは同じく必要 |
-
-> **`androidScheme` は変更しないでください。** localStorage の保存先がこの設定で決まるため、
-> 変えると過去の記録が読めなくなります。
-
-### 完全オフラインの仕組み（OCR）
+## 完全オフラインの仕組み（OCR）
 
 既定では tesseract.js は実行ファイルと日本語の学習データを CDN から取りに行きますが、
 `npm run ocr:bundle`（`npm run build` に含まれる）が `public/tesseract/` に配置し、
@@ -247,7 +195,6 @@ npm run android:sync
 | **素の CSS** | CSS変数ベース。UIライブラリ不使用（ライトテーマ + グリーンアクセント） |
 | **localStorage** | データ保存（Repository 経由で差し替え可能） |
 | **tesseract.js** | レシートOCR（端末内で実行・動的import・データ同梱でオフライン可） |
-| **Capacitor** | ネイティブアプリ（APK）化。Web版と同じコードをそのまま使う |
 
 **依存を意図的に増やしていません。** 円グラフもラインアイコンもインライン SVG で自前描画、状態管理は React Context のみ。本番バンドルは gzip 約 85KB です（OCR エンジンは別チャンクで、レシート読み取りを使ったときだけ読み込まれます）。
 
@@ -302,7 +249,6 @@ public/
 ├── icon-*.png                  アイコン（scripts/generate-icons.mjs で生成）
 └── tesseract/                  OCRの実行ファイルと学習データ（npm run ocr:bundle で生成）
 
-android/                        ネイティブアプリ（Capacitor が生成）
 scripts/
 ├── generate-icons.mjs          PNGアイコン生成（自前のPNGエンコーダ）
 ├── bundle-ocr.mjs              OCRファイルの同梱
@@ -454,7 +400,6 @@ Settings      { income, budgetMode, defaultBudget, ... }   // budgetMode: auto |
 | **オフライン起動** | 配信サーバーを停止した状態でリロード → アプリが正常に起動 ✅ |
 | **Androidの戻る操作** | 選択シート → 登録画面 → 前ページ の順に1階層ずつ戻る ✅ |
 | **OCRの完全オフライン動作** | 通信を監視しながら実行 → 外部リクエスト0件で合計¥470を抽出 ✅ |
-| APKへの同梱 | 学習データを含む23MBが `android/app/src/main/assets/public` に配置 ✅ |
 | 　同上・履歴のずれ | ×ボタンで閉じた後も、戻るが空振りしない ✅ |
 | レシート読み取り（実機OCR） | コンビニレシート画像 → **合計 ¥470** を第一候補、日付 9/9、店名を抽出 ✅ |
 | 　同上・誤検出の除外 | お釣り530・現金1,000・ポイント5・レジ番号1234・住所1-2-3 をすべて除外 ✅ |
@@ -480,8 +425,6 @@ Settings      { income, budgetMode, defaultBudget, ... }   // budgetMode: auto |
 - **レシートOCRの精度は「fast版」の学習データによります。** オフライン用に軽い方（2.4MB）を
   同梱しているため、通常版（15MB）よりわずかに精度が落ちます。
   精度を優先したい場合は `scripts/bundle-ocr.mjs` の `LANG_URL` を `4.0.0_fast` から `4.0.0` に変えてください。
-- **APK版はストア配布用の署名をしていません。** 自分の端末に入れる用途（デバッグビルド）です。
-  Play ストアに出す場合は署名鍵の作成とリリースビルドが別途必要です。
 - **UIはライトテーマ固定です。** 添付デザインに合わせているため、端末のダークモードには追随しません。
 - **レシート読み取りは目安です。** きれいに撮れたレシートなら合計金額はよく当たりますが、しわ・
   感熱紙の退色・斜め撮り・手書きレシートでは外れます。だから自動確定せず候補提示にしています。

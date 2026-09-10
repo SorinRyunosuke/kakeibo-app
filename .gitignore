@@ -34,3 +34,11 @@ public/tesseract/
 
 # アイコンの元画像（npm run icons で生成）
 resources/icon.png
+
+# ネイティブアプリ（APK）関連はリポジトリに含めない。
+# Web/PWA として使う構成。APK 化が必要になったら
+#   npm i -D @capacitor/cli @capacitor/core @capacitor/android
+#   npx cap init && npx cap add android
+# でいつでも作り直せる。
+/android/
+/capacitor.config.ts
