@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# アップロード用のZIP（生成物）
+kakeibo-site.zip
+
+# Vercel
+.vercel
+
+# OCRの実行ファイル・学習データ（npm run ocr:bundle で生成、約23MB）
+public/tesseract/
+
+# アイコンの元画像（npm run icons で生成）
+resources/icon.png
