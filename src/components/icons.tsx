@@ -209,3 +209,17 @@ export const IconWallet = (p: Props) => (
     <path d="M16 12h3.5" />
   </Svg>
 );
+
+export const IconLock = (p: Props) => (
+  <Svg {...p}>
+    <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+    <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+  </Svg>
+);
+
+export const IconLogout = (p: Props) => (
+  <Svg {...p}>
+    <path d="M14 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8" />
+    <path d="M14 12h7M18 8.5l3.5 3.5L18 15.5" />
+  </Svg>
+);

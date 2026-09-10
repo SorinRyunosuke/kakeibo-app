@@ -1260,3 +1260,62 @@ svg {
   border-color: var(--primary);
   color: var(--primary-strong);
 }
+
+/* --- ログイン / アカウント作成 ---------------------------------------------- */
+
+.auth-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 22px calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+.auth-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  font-size: 29px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #34b98a 0%, #0a8f61 100%);
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.auth-form {
+  margin-top: 26px;
+}
+
+.auth-error {
+  margin: -2px 0 14px;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-note {
+  margin-top: 16px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--text-faint);
+  text-align: center;
+}

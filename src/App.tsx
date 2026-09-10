@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { AppProvider, useApp } from './store/AppContext';
+import { AuthProvider } from './store/AuthContext';
+import { AuthGate } from './screens/AuthGate';
 import { Dashboard } from './screens/Dashboard';
 import { ExpenseList } from './screens/ExpenseList';
 import { Analytics } from './screens/Analytics';
@@ -182,9 +184,15 @@ function TabButton({
 }
 
 export default function App() {
+  // ログインを通るまで AppProvider をマウントしない。
+  // = 未ログインのあいだは家計簿データの読み込みすら行わない。
   return (
-    <AppProvider>
-      <Shell />
-    </AppProvider>
+    <AuthProvider>
+      <AuthGate>
+        <AppProvider>
+          <Shell />
+        </AppProvider>
+      </AuthGate>
+    </AuthProvider>
   );
 }

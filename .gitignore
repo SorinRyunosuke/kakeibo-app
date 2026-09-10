@@ -29,6 +29,9 @@ kakeibo-site.zip
 # Vercel
 .vercel
 
+# Claude Code のローカル設定（プレビューサーバー起動用）
+.claude/
+
 # OCRの実行ファイル・学習データ（npm run ocr:bundle で生成、約23MB）
 public/tesseract/
 

@@ -1,19 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
+import { useAuth } from '../store/AuthContext';
 import { getBudgetForMonth, totalFixedExpenses } from '../lib/budget';
+import { checkPasswordStrength } from '../lib/auth';
 import { toMonthKey } from '../lib/date';
 import { yen } from '../lib/format';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
-import { PageHead, Section } from '../components/ui';
+import { PageHead, Section, Sheet } from '../components/ui';
 import {
   IconCard,
   IconChevronRight,
   IconDownload,
   IconHistory,
   IconInfo,
+  IconLock,
+  IconLogout,
   IconRepeat,
   IconTag,
   IconTarget,
+  IconUser,
 } from '../components/icons';
 
 // ============================================================================
@@ -24,6 +29,8 @@ export type MorePage = 'budget' | 'fixed' | 'cards' | 'categories' | 'history' |
 
 export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
   const { data } = useApp();
+  const { username, logout } = useAuth();
+  const [pwSheet, setPwSheet] = useState(false);
   const month = toMonthKey(new Date());
 
   const budget = useMemo(
@@ -117,6 +124,57 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
         </div>
       </Section>
 
+      <Section title="アカウント">
+        <div className="list">
+          <div className="list-row">
+            <span
+              className="tile"
+              style={{ background: 'color-mix(in srgb, #5b9df9 14%, #fff)', color: '#5b9df9' }}
+            >
+              <IconUser size={19} />
+            </span>
+            <span className="list-row-main">
+              <span className="list-row-title">{username ?? '—'}</span>
+              <span className="list-row-sub">ログイン中（この端末）</span>
+            </span>
+          </div>
+
+          <button className="list-row" onClick={() => setPwSheet(true)}>
+            <span
+              className="tile"
+              style={{ background: 'color-mix(in srgb, #8fa0b5 14%, #fff)', color: '#8fa0b5' }}
+            >
+              <IconLock size={19} />
+            </span>
+            <span className="list-row-main">
+              <span className="list-row-title">パスワードを変更</span>
+            </span>
+            <IconChevronRight size={16} className="chevron" />
+          </button>
+
+          <button
+            className="list-row"
+            onClick={() => {
+              if (confirm('ログアウトしますか？\n再度使うにはパスワードの入力が必要です。')) {
+                logout();
+              }
+            }}
+          >
+            <span
+              className="tile"
+              style={{ background: 'color-mix(in srgb, var(--danger) 14%, #fff)', color: 'var(--danger)' }}
+            >
+              <IconLogout size={19} />
+            </span>
+            <span className="list-row-main">
+              <span className="list-row-title" style={{ color: 'var(--danger)' }}>
+                ログアウト
+              </span>
+            </span>
+          </button>
+        </div>
+      </Section>
+
       <p className="hint" style={{ marginTop: 22, textAlign: 'center' }}>
         データはこの端末のブラウザ内にのみ保存されます。
         <br />
@@ -124,7 +182,92 @@ export function More({ onOpen }: { onOpen: (page: MorePage) => void }) {
         <br />
         定期的にバックアップを取ってください。
       </p>
+
+      {pwSheet && <PasswordSheet onClose={() => setPwSheet(false)} />}
     </div>
+  );
+}
+
+/** パスワード変更シート */
+function PasswordSheet({ onClose }: { onClose: () => void }) {
+  const { changePassword } = useAuth();
+  const { showToast } = useApp();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError(null);
+    const strength = checkPasswordStrength(next);
+    if (strength) {
+      setError(strength);
+      return;
+    }
+    if (next !== confirmPw) {
+      setError('確認用のパスワードが一致しません');
+      return;
+    }
+    setBusy(true);
+    const result = await changePassword(current, next);
+    if (result === 'wrong') {
+      setError('現在のパスワードが違います');
+      setBusy(false);
+      return;
+    }
+    showToast('パスワードを変更しました');
+    onClose();
+  };
+
+  return (
+    <Sheet
+      title="パスワードを変更"
+      onClose={onClose}
+      rightAction={
+        <button className="link" onClick={submit}>
+          変更
+        </button>
+      }
+    >
+      <div className="field">
+        <label className="field-label">現在のパスワード</label>
+        <input
+          className="input"
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          autoComplete="current-password"
+        />
+      </div>
+      <div className="field">
+        <label className="field-label">新しいパスワード</label>
+        <input
+          className="input"
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          placeholder="4文字以上"
+          autoComplete="new-password"
+        />
+      </div>
+      <div className="field">
+        <label className="field-label">新しいパスワード（確認）</label>
+        <input
+          className="input"
+          type="password"
+          value={confirmPw}
+          onChange={(e) => setConfirmPw(e.target.value)}
+          autoComplete="new-password"
+        />
+      </div>
+
+      {error && <p className="auth-error">{error}</p>}
+
+      <button className="btn btn-primary btn-block mt-8" onClick={submit} disabled={busy}>
+        {busy ? '変更中…' : 'パスワードを変更'}
+      </button>
+    </Sheet>
   );
 }
 
