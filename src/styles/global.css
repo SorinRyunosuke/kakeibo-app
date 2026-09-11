@@ -1435,3 +1435,132 @@ svg {
   border-radius: 50%;
   display: inline-block;
 }
+
+/* --- 月替わりのお祝い/残念演出 ------------------------------------------ */
+
+.review-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  animation: fade 0.2s ease;
+}
+
+.review-win {
+  background: linear-gradient(180deg, rgba(13, 158, 107, 0.3), rgba(15, 20, 25, 0.55));
+}
+
+.review-lose {
+  background: rgba(15, 20, 25, 0.55);
+}
+
+.review-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 30px 22px 22px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.review-icon {
+  font-size: 46px;
+  display: block;
+  line-height: 1;
+}
+
+.review-title {
+  margin-top: 12px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.review-amount {
+  margin-top: 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.review-amount.pos {
+  color: var(--primary);
+}
+
+.review-amount.neg {
+  color: var(--danger);
+}
+
+.review-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.pop-in {
+  animation: pop-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+}
+
+.droop-in {
+  animation: droop-in 0.5s ease;
+}
+
+@keyframes droop-in {
+  0% {
+    transform: translateY(-14px) rotate(-2deg);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(4px) rotate(1deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.4, 0.1, 0.6, 0.9);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(112vh) rotate(540deg);
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-backdrop,
+  .pop-in,
+  .droop-in,
+  .confetti-piece {
+    animation: none !important;
+  }
+}

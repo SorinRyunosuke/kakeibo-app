@@ -16,6 +16,8 @@ import { FixedIncomePage } from './screens/settings/FixedIncomePage';
 import { BackupPage } from './screens/settings/BackupPage';
 import { IconChart, IconDots, IconHome, IconPlus, IconReceipt } from './components/icons';
 import { BackGuard } from './lib/useBackClose';
+import { useMonthlyReview } from './lib/useMonthlyReview';
+import { MonthlyReview } from './components/MonthlyReview';
 import type { CreditCard, Expense } from './types';
 
 // ============================================================================
@@ -35,11 +37,13 @@ const TABS: { id: Tab; label: string; Icon: typeof IconHome }[] = [
 ];
 
 function Shell() {
-  const { loading, toast } = useApp();
+  const { data, loading, toast } = useApp();
   const [tab, setTab] = useState<Tab>('home');
   const [stack, setStack] = useState<Page[]>([]);
   // null = 閉じている / 'new' = 新規登録 / Expense = 編集
   const [form, setForm] = useState<Expense | 'new' | null>(null);
+  // 月替わりで「先月は貯金できたか」を一度だけお祝い/残念演出で見せる
+  const monthlyReview = useMonthlyReview(data, loading);
 
   const top = stack[stack.length - 1] ?? null;
 
@@ -129,6 +133,14 @@ function Shell() {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {monthlyReview.pending && (
+        <MonthlyReview
+          month={monthlyReview.pending.month}
+          savings={monthlyReview.pending.savings}
+          onClose={monthlyReview.dismiss}
+        />
+      )}
     </div>
   );
 }

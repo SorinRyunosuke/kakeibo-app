@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { summarizeMonth } from '../lib/budget';
 import { toMonthKey } from '../lib/date';
-import { percent, yen } from '../lib/format';
+import { percent, signedYen, yen } from '../lib/format';
 import { AppBar, Delta, PeriodBar } from '../components/ui';
 import { IconChevronRight } from '../components/icons';
+import { MonthlyReview } from '../components/MonthlyReview';
 
 // ============================================================================
-// 月別履歴。1年分を並べて「先月よりいくら多く使ったか」を一覧する。
+// 月別履歴。1年分を並べて「先月よりいくら多く使ったか」「結局いくら貯金
+// できたか」を一覧する。行をタップするとお祝い/残念演出を見返せる。
 // ============================================================================
 
 export function MonthlyHistory({
@@ -21,11 +23,18 @@ export function MonthlyHistory({
   const today = new Date();
   const currentMonth = toMonthKey(today);
   const [year, setYear] = useState(today.getFullYear());
+  const [reviewMonth, setReviewMonth] = useState<string | null>(null);
 
   /** その年の 12ヶ月分。未来の月と、データのない過去月は出さない */
   const rows = useMemo(() => {
-    const out: { month: string; total: number; diff: number | null; budget: number; ratio: number }[] =
-      [];
+    const out: {
+      month: string;
+      total: number;
+      diff: number | null;
+      budget: number;
+      ratio: number;
+      savings: number;
+    }[] = [];
     for (let m = 12; m >= 1; m--) {
       const month = `${year}-${String(m).padStart(2, '0')}`;
       if (month > currentMonth) continue;
@@ -44,12 +53,14 @@ export function MonthlyHistory({
         diff: prevTotal === 0 && s.total === 0 ? null : s.total - prevTotal,
         budget: s.budget,
         ratio: s.ratio,
+        savings: s.remaining,
       });
     }
     return out;
   }, [data, year, currentMonth]);
 
   const yearTotal = rows.reduce((s, r) => s + r.total, 0);
+  const yearSavings = rows.reduce((s, r) => s + r.savings, 0);
 
   return (
     <div className="page">
@@ -64,8 +75,21 @@ export function MonthlyHistory({
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="row-between">
-          <span className="small muted">{year}年の合計</span>
+          <span className="small muted">{year}年の合計支出</span>
           <b style={{ fontSize: 20, letterSpacing: '-0.02em' }}>{yen(yearTotal)}</b>
+        </div>
+        <div className="divider" />
+        <div className="row-between">
+          <span className="small muted">{year}年の貯金</span>
+          <b
+            style={{
+              fontSize: 20,
+              letterSpacing: '-0.02em',
+              color: yearSavings > 0 ? 'var(--primary)' : yearSavings < 0 ? 'var(--danger)' : undefined,
+            }}
+          >
+            {signedYen(yearSavings)}
+          </b>
         </div>
       </div>
 
@@ -78,11 +102,15 @@ export function MonthlyHistory({
         <div className="list">
           {rows.map((r) => {
             const m = Number(r.month.split('-')[1]);
+            const isCurrent = r.month === currentMonth;
             return (
               <button
                 key={r.month}
                 className="list-row"
-                onClick={() => onSelectMonth?.(r.month)}
+                onClick={() => {
+                  onSelectMonth?.(r.month);
+                  setReviewMonth(r.month);
+                }}
               >
                 <span
                   style={{
@@ -96,21 +124,32 @@ export function MonthlyHistory({
                 </span>
                 <span className="list-row-main">
                   <span className="row-between">
-                    <span className="list-row-value">{yen(r.total)}</span>
-                    <span className="tiny">
-                      {r.diff === null ? (
-                        <span className="faint">—</span>
-                      ) : (
-                        <Delta value={r.diff} />
-                      )}
+                    <span
+                      className="list-row-value"
+                      style={{
+                        color:
+                          r.savings > 0
+                            ? 'var(--primary)'
+                            : r.savings < 0
+                              ? 'var(--danger)'
+                              : undefined,
+                      }}
+                    >
+                      貯金 {signedYen(r.savings)}
                     </span>
+                    {isCurrent && (
+                      <span className="badge badge-ok" style={{ marginLeft: 6 }}>
+                        今月の見込み
+                      </span>
+                    )}
                   </span>
                   <span className="list-row-sub">
-                    予算 {yen(r.budget)} · 使用率 {percent(r.ratio)}%
-                    {r.month === currentMonth && (
-                      <span className="badge badge-ok" style={{ marginLeft: 6 }}>
-                        今月
-                      </span>
+                    支出 {yen(r.total)} · 使用率 {percent(r.ratio)}%
+                    {r.diff !== null && (
+                      <>
+                        {' '}
+                        · <Delta value={r.diff} />
+                      </>
                     )}
                   </span>
                 </span>
@@ -120,6 +159,20 @@ export function MonthlyHistory({
           })}
         </div>
       )}
+
+      {reviewMonth &&
+        (() => {
+          const r = rows.find((x) => x.month === reviewMonth);
+          if (!r) return null;
+          return (
+            <MonthlyReview
+              month={r.month}
+              savings={r.savings}
+              projected={r.month === currentMonth}
+              onClose={() => setReviewMonth(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
