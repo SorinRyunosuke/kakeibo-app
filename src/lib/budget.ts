@@ -1,16 +1,22 @@
-import type { AppData, Expense, FixedExpense, FixedIncome } from '../types';
+import type { AppData, CreditCard, Expense, FixedExpense, FixedIncome } from '../types';
 import { monthOf } from './date';
+import { buildBillingCycles } from './creditCard';
 
 // ============================================================================
 // 予算計算
 //
 // このアプリでいちばん大事な数字「今月あといくら使えるか」を出す。
 //
-//   今月あと使えるお金 = 固定収入合計 − 固定費合計 − 今月の使用額
+//   今月あと使えるお金
+//     = 固定収入合計 − 固定費合計 − 今月の使用額 − 今月引き落とされるカード請求
 //
 // 「使用額」には固定費由来の支出を含めない。
 // 固定収入 − 固定費 の時点で固定費は差し引かれているので、
 // 家賃の支払いをここから引くと二重に引くことになるため。
+//
+// 「今月引き落とされるカード請求」は、過去の月に使ったぶんの引き落としだけを
+// 対象にする。今月使った分（= すでに「今月の使用額」に入っている）まで
+// 足すと二重計上になるため、請求サイクルの中身を利用日で振り分けて除く。
 // ============================================================================
 
 /** 毎週◯円 → 1ヶ月あたりに換算（×52/12） */
@@ -55,6 +61,30 @@ export function expensesInMonth(expenses: Expense[], month: string): Expense[] {
   return expenses.filter((e) => monthOf(e.date) === month);
 }
 
+/**
+ * 指定月に口座から引き落とされるカード請求のうち、まだ「今月の使用額」に
+ * 含まれていない分（= 過去の月に使って、今月引き落とされる分）を返す。
+ * 同じ月内で使って同じ月内に引き落とされるカード（締め日が早いカード等）は
+ * 使用額側ですでに数えているので、ここでは除いて二重計上を防ぐ。
+ */
+export function cardPaymentDueThisMonth(
+  cards: CreditCard[],
+  expenses: Expense[],
+  month: string,
+): number {
+  let total = 0;
+  for (const card of cards) {
+    if (card.archived) continue;
+    for (const cycle of buildBillingCycles(card, expenses)) {
+      if (monthOf(cycle.paymentDate) !== month) continue;
+      for (const e of cycle.expenses) {
+        if (monthOf(e.date) !== month) total += e.amount;
+      }
+    }
+  }
+  return total;
+}
+
 export type WarningLevel = 'safe' | 'notice' | 'warning' | 'danger' | 'over';
 
 /** 使用率から警告レベルを決める */
@@ -72,6 +102,8 @@ export interface MonthSummary {
   budget: number;
   /** 今月の使用額 (固定費由来は含まない) */
   spent: number;
+  /** 今月引き落とされるカード請求のうち、過去月に使った分（使用額と二重計上しない） */
+  cardPaymentDue: number;
   /** 今月あと使えるお金。マイナスなら使いすぎ */
   remaining: number;
   /** 使用率 0-∞ (budget 0 のときは 0) */
@@ -117,13 +149,15 @@ export function summarizeMonth(data: AppData, month: string): MonthSummary {
     categoryMap.set(e.categoryId, (categoryMap.get(e.categoryId) ?? 0) + e.amount);
   }
 
-  const remaining = budget - spent;
-  const ratio = budget > 0 ? spent / budget : 0;
+  const cardPaymentDue = cardPaymentDueThisMonth(data.creditCards, data.expenses, month);
+  const remaining = budget - spent - cardPaymentDue;
+  const ratio = budget > 0 ? (spent + cardPaymentDue) / budget : 0;
 
   return {
     month,
     budget,
     spent,
+    cardPaymentDue,
     remaining,
     ratio,
     overspend: remaining < 0 ? -remaining : 0,

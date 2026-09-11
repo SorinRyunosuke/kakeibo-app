@@ -130,6 +130,75 @@ describe('予算 = 固定収入 - 固定費', () => {
   });
 });
 
+describe('今月あと使えるお金にカードの引き落としも入れる', () => {
+  it('先月使ったカード利用分が今月引き落としなら、今月の「あと使えるお金」から引かれる', () => {
+    const data = createEmptyData();
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
+    data.creditCards = [
+      { id: 'c1', name: 'カード', closingDay: 99, paymentDay: 10, paymentMonthOffset: 1, color: '#000' },
+    ];
+    // 8月に使った分 -> 8/31締め -> 9/10引き落とし
+    data.expenses = [
+      { id: 'e1', amount: 30000, date: '2026-08-20', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
+    ];
+    const s = summarizeMonth(data, '2026-09');
+    expect(s.spent).toBe(0); // 8月の支出なので9月の使用額には入らない
+    expect(s.cardPaymentDue).toBe(30000);
+    expect(s.remaining).toBe(250000 - 30000);
+  });
+
+  it('今月使って今月引き落としのカード（同月精算）は二重計上しない', () => {
+    const data = createEmptyData();
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
+    data.creditCards = [
+      { id: 'c1', name: '即時精算カード', closingDay: 5, paymentDay: 26, paymentMonthOffset: 0, color: '#000' },
+    ];
+    // 9/3利用 -> 9/5締め -> 9/26払い（同じ月で完結）
+    data.expenses = [
+      { id: 'e1', amount: 10000, date: '2026-09-03', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
+    ];
+    const s = summarizeMonth(data, '2026-09');
+    expect(s.spent).toBe(10000); // 使用額としてすでに計上
+    expect(s.cardPaymentDue).toBe(0); // 引き落とし側では二重に引かない
+    expect(s.remaining).toBe(250000 - 10000);
+  });
+
+  it('停止中(archived)のカードは引き落とし計算に含めない', () => {
+    const data = createEmptyData();
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
+    data.creditCards = [
+      { id: 'c1', name: '停止中カード', closingDay: 99, paymentDay: 10, paymentMonthOffset: 1, color: '#000', archived: true },
+    ];
+    data.expenses = [
+      { id: 'e1', amount: 30000, date: '2026-08-20', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
+    ];
+    const s = summarizeMonth(data, '2026-09');
+    expect(s.cardPaymentDue).toBe(0);
+    expect(s.remaining).toBe(250000);
+  });
+
+  it('カード引き落とし分は使用率(ratio)にも反映される', () => {
+    const data = createEmptyData();
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 100000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
+    data.creditCards = [
+      { id: 'c1', name: 'カード', closingDay: 99, paymentDay: 10, paymentMonthOffset: 1, color: '#000' },
+    ];
+    data.expenses = [
+      { id: 'e1', amount: 40000, date: '2026-08-20', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
+    ];
+    const s = summarizeMonth(data, '2026-09');
+    expect(s.ratio).toBeCloseTo(0.4);
+  });
+});
+
 describe('警告レベル', () => {
   it.each([
     [0.0, 'safe'],

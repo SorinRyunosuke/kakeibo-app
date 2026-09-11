@@ -107,6 +107,11 @@ export function Analytics({ onOpenCard }: { onOpenCard: (card: CreditCard) => vo
                   }}
                 />
               </div>
+              {s.cardPaymentDue > 0 && (
+                <p className="stat-foot">
+                  <span>うちカード引き落とし {yen(s.cardPaymentDue)}</span>
+                </p>
+              )}
             </div>
           </div>
 
