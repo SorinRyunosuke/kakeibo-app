@@ -1,26 +1,30 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext';
-import { totalFixedIncomes } from '../../lib/budget';
+import { totalFixedExpenses, totalFixedIncomes } from '../../lib/budget';
 import { yen } from '../../lib/format';
-import { AppBar, Empty, Segmented, Sheet, Toggle } from '../../components/ui';
-import { IconEdit, IconPlus, IconTrash } from '../../components/icons';
+import { AppBar, Empty, Section, Segmented, Sheet, Toggle } from '../../components/ui';
+import { IconEdit, IconInfo, IconPlus, IconTrash } from '../../components/icons';
 import { END_OF_MONTH, WEEKDAYS_JA, type FixedIncome, type RecurrenceFreq } from '../../types';
 import { describeRecurrence } from './FixedExpensePage';
 
 // ============================================================================
 // 固定収入（給料・バイト代など）
 //
-// - 予算モードが「固定収入から自動」のとき、この合計から固定費を引いた額が予算になる
+// - 「固定収入合計 − 固定費合計 = 今月あと使えるお金」の元になる
 // - 「分析 → カレンダー」の入金予定にも表示される
+// - 使用率アラートの設定もここに置く（旧「予算設定」画面から移設）
 // ============================================================================
 
 const DAY_OPTIONS = [...Array.from({ length: 28 }, (_, i) => i + 1), END_OF_MONTH];
 
 export function FixedIncomePage({ onBack }: { onBack: () => void }) {
-  const { data, updateFixedIncome, deleteFixedIncome, showToast } = useApp();
+  const { data, updateFixedIncome, deleteFixedIncome, updateSettings, showToast } = useApp();
   const [editing, setEditing] = useState<FixedIncome | 'new' | null>(null);
 
   const total = totalFixedIncomes(data.fixedIncomes);
+  const fixedTotal = totalFixedExpenses(data.fixedExpenses);
+  const freeToSpend = Math.max(0, total - fixedTotal);
+  const alerts = data.settings.alerts;
 
   return (
     <div className="page">
@@ -31,8 +35,13 @@ export function FixedIncomePage({ onBack }: { onBack: () => void }) {
         <p style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--primary)' }}>
           {yen(total)}
         </p>
+        <div className="divider" />
+        <div className="row-between small">
+          <span className="muted">今月あと使えるお金（固定収入 − 固定費）</span>
+          <b style={{ color: 'var(--primary)' }}>{yen(freeToSpend)}</b>
+        </div>
         <p className="hint">
-          予算モードが「固定収入から自動」のとき、この合計から固定費を引いた額が「自由に使えるお金」になります。
+          この額から日々の支出を引いたものが、ホームの「今月あと使えるお金」です。
           カレンダーの入金予定にも表示されます。
         </p>
       </div>
@@ -89,6 +98,32 @@ export function FixedIncomePage({ onBack }: { onBack: () => void }) {
       <button className="btn-add mt-12" onClick={() => setEditing('new')}>
         <IconPlus size={16} /> 固定収入を追加
       </button>
+
+      <Section title="使いすぎアラート">
+        <div className="list">
+          {(
+            [
+              ['at70', '70%でお知らせ'],
+              ['at90', '90%でお知らせ'],
+              ['at100', '100%（使いすぎ）でお知らせ'],
+            ] as const
+          ).map(([key, label]) => (
+            <div className="list-row" key={key}>
+              <span className="list-row-main">
+                <span className="list-row-title">{label}</span>
+              </span>
+              <Toggle
+                on={alerts[key]}
+                onChange={(v) => updateSettings({ alerts: { ...alerts, [key]: v } })}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="note" style={{ marginTop: 10 }}>
+          <IconInfo size={15} />
+          <span>ホームに注意の帯を出すかどうかの設定です。金額の計算は変わりません。</span>
+        </div>
+      </Section>
 
       {editing && (
         <IncomeEditor item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />

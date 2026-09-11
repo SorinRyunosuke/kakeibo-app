@@ -61,14 +61,6 @@ export interface Category {
   order: number;
 }
 
-/** 月次予算 (月ごとに手動で上書きしたい場合に使う) */
-export interface Budget {
-  id: string;
-  /** YYYY-MM */
-  month: string;
-  amount: number;
-}
-
 /** 繰り返しの周期 */
 export type RecurrenceFreq = 'monthly' | 'weekly';
 
@@ -93,7 +85,7 @@ export interface FixedExpense {
 
 /**
  * 固定収入（給料・バイト代など）。
- * - 予算モードが 'auto' のとき「固定収入合計 − 固定費合計 = 自由に使えるお金」
+ * - 「固定収入合計 − 固定費合計 = 今月あと使えるお金」の元になる
  * - カレンダーの「入金予定」表示にも使う
  */
 export interface FixedIncome {
@@ -108,10 +100,7 @@ export interface FixedIncome {
   active: boolean;
 }
 
-/** 予算の決め方 */
-export type BudgetMode = 'auto' | 'manual';
-
-/** 予算アラートを出す使用率のしきい値 */
+/** 使用率がこのしきい値を超えたらダッシュボードで注意を出す */
 export interface AlertSettings {
   at70: boolean;
   at90: boolean;
@@ -121,13 +110,6 @@ export interface AlertSettings {
 export interface Settings {
   /** 使用率がしきい値を超えたときにダッシュボードで知らせる */
   alerts: AlertSettings;
-  /**
-   * auto   : 予算 = 有効な固定収入合計 - 有効な固定費合計
-   * manual : 予算 = defaultBudget (月ごとの Budget があればそちらが優先)
-   */
-  budgetMode: BudgetMode;
-  /** budgetMode === 'manual' のときの既定予算 */
-  defaultBudget: number;
   /** 直近で使った支払方法・カード (支出登録の初期値に使う) */
   lastPaymentMethod?: PaymentMethod;
   lastCreditCardId?: string;
@@ -139,7 +121,6 @@ export interface AppData {
   expenses: Expense[];
   creditCards: CreditCard[];
   categories: Category[];
-  budgets: Budget[];
   fixedExpenses: FixedExpense[];
   fixedIncomes: FixedIncome[];
   settings: Settings;

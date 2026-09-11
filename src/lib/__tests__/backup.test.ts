@@ -5,7 +5,7 @@ import { END_OF_MONTH, type AppData } from '../../types';
 
 function sampleData(): AppData {
   const d = createEmptyData();
-  d.settings = { budgetMode: 'auto', defaultBudget: 0, alerts: { at70: true, at90: true, at100: true } };
+  d.settings = { alerts: { at70: true, at90: false, at100: true } };
   d.fixedIncomes = [
     { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
   ];
@@ -31,7 +31,6 @@ function sampleData(): AppData {
       active: true,
     },
   ];
-  d.budgets = [{ id: 'b1', month: '2026-09', amount: 90000 }];
   d.expenses = [
     {
       id: 'e1',
@@ -73,16 +72,34 @@ describe('JSONバックアップ', () => {
   it('壊れた／古いデータでも既定値で起動できる', () => {
     expect(migrate(null).categories.length).toBeGreaterThan(0);
     expect(migrate({ expenses: 'これは配列ではない' }).expenses).toEqual([]);
-    // 一部だけ持つ設定は既定値とマージされる
-    const partial = migrate({ settings: { budgetMode: 'auto' } });
-    expect(partial.settings.budgetMode).toBe('auto');
-    expect(partial.settings.defaultBudget).toBe(80000);
+    // alerts は一部だけ持っていても既定値とマージされる
+    const partial = migrate({ settings: { alerts: { at90: false } } });
+    expect(partial.settings.alerts).toEqual({ at70: true, at90: false, at100: true });
+  });
+
+  it('v3以前の予算設定（budgetMode / defaultBudget / budgets）は取り込まない', () => {
+    const migrated = migrate({
+      schemaVersion: 3,
+      budgets: [{ id: 'b1', month: '2026-09', amount: 90000 }],
+      settings: { budgetMode: 'manual', defaultBudget: 123456, alerts: { at70: true, at90: true, at100: true } },
+    });
+    expect(migrated).not.toHaveProperty('budgets');
+    expect(migrated.settings).not.toHaveProperty('budgetMode');
+    expect(migrated.settings).not.toHaveProperty('defaultBudget');
+  });
+
+  it('v3以前のデータには「保険」カテゴリが補われる', () => {
+    const migrated = migrate({
+      schemaVersion: 3,
+      categories: [{ id: 'cat_rent', name: '家賃', color: '#4cb782', icon: '🏠', order: 10 }],
+    });
+    expect(migrated.categories.some((c) => c.id === 'cat_insurance')).toBe(true);
   });
 
   it('v2以前の手取り月収(settings.income)は「給料」の固定収入に移行される', () => {
     const migrated = migrate({
       schemaVersion: 2,
-      settings: { income: 240000, budgetMode: 'auto' },
+      settings: { income: 240000 },
     });
     expect(migrated.settings).not.toHaveProperty('income');
     expect(migrated.fixedIncomes).toEqual([

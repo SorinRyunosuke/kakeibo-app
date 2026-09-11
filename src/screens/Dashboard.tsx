@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
 import { useApp } from '../store/AppContext';
-import { summarizeMonth, type WarningLevel } from '../lib/budget';
+import {
+  summarizeMonth,
+  totalFixedExpenses,
+  totalFixedIncomes,
+  type WarningLevel,
+} from '../lib/budget';
 import { summarizeCards } from '../lib/creditCard';
 import { addMonthsToKey, toMonthKey } from '../lib/date';
 import { percent, yen } from '../lib/format';
@@ -36,7 +41,7 @@ function warningMessage(
   if (level === 'over' && alerts.at100) {
     return {
       icon: '🚨',
-      text: `今月の予算を ${yen(-remaining)} 超えています`,
+      text: `今月使えるお金を ${yen(-remaining)} 超えています`,
       bg: '#fdeceb',
       fg: '#c8352e',
     };
@@ -52,7 +57,7 @@ function warningMessage(
   if (level === 'warning' && alerts.at70) {
     return {
       icon: '⚠️',
-      text: `今月の予算の ${percent(ratio)}% を使用しています`,
+      text: `今月使えるお金の ${percent(ratio)}% を使いました`,
       bg: '#fdf3e0',
       fg: '#a86a08',
     };
@@ -64,18 +69,21 @@ export function Dashboard({
   onEditExpense,
   onOpenExpenses,
   onOpenAnalytics,
-  onOpenBudget,
+  onOpenIncome,
   onOpenCards,
 }: {
   onEditExpense: (e: Expense) => void;
   onOpenExpenses: () => void;
   onOpenAnalytics: () => void;
-  onOpenBudget: () => void;
+  onOpenIncome: () => void;
   onOpenCards: () => void;
 }) {
   const { data } = useApp();
   const today = new Date();
   const month = toMonthKey(today);
+
+  const incomeTotal = totalFixedIncomes(data.fixedIncomes);
+  const fixedTotal = totalFixedExpenses(data.fixedExpenses);
 
   const summary = useMemo(() => summarizeMonth(data, month), [data, month]);
   const prev = useMemo(() => summarizeMonth(data, addMonthsToKey(month, -1)), [data, month]);
@@ -120,7 +128,7 @@ export function Dashboard({
       : []),
   ];
 
-  const budgetNotSet = summary.budget <= 0;
+  const noIncome = incomeTotal <= 0;
 
   return (
     <div className="page">
@@ -131,12 +139,12 @@ export function Dashboard({
         </span>
       </header>
 
-      {/* ---------- 1. 今月あと使える金額 ---------- */}
+      {/* ---------- 1. 今月あと使えるお金 ---------- */}
       <div className="hero">
-        <p className="hero-label">今月あと使える金額</p>
+        <p className="hero-label">今月あと使えるお金</p>
         <p className="hero-amount">{yen(summary.remaining)}</p>
         <p className="hero-sub">
-          使用額 {yen(summary.spent)} / 予算 {yen(summary.budget)}
+          固定収入 {yen(incomeTotal)} − 固定費 {yen(fixedTotal)} − 使用額 {yen(summary.spent)}
         </p>
         <div className="hero-bar">
           <div
@@ -145,7 +153,7 @@ export function Dashboard({
           />
         </div>
         <p className="hero-rate">
-          {budgetNotSet ? '予算未設定' : `使用率 ${percent(summary.ratio)}%`}
+          {noIncome ? '固定収入 未登録' : `使用率 ${percent(summary.ratio)}%`}
         </p>
       </div>
 
@@ -159,11 +167,11 @@ export function Dashboard({
         </div>
       )}
 
-      {budgetNotSet && (
-        <button className="alert" style={{ width: '100%' }} onClick={onOpenBudget}>
+      {noIncome && (
+        <button className="alert" style={{ width: '100%' }} onClick={onOpenIncome}>
           <span>💡</span>
           <span className="grow" style={{ textAlign: 'left' }}>
-            予算を設定すると「あと使える金額」が出ます
+            固定収入（給料など）を登録すると「あと使えるお金」が出ます
           </span>
         </button>
       )}

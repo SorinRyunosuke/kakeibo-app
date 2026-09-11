@@ -1,11 +1,4 @@
-import type {
-  AppData,
-  Budget,
-  Expense,
-  FixedExpense,
-  FixedIncome,
-  Settings,
-} from '../types';
+import type { AppData, Expense, FixedExpense, FixedIncome } from '../types';
 import { monthOf } from './date';
 
 // ============================================================================
@@ -13,14 +6,11 @@ import { monthOf } from './date';
 //
 // このアプリでいちばん大事な数字「今月あといくら使えるか」を出す。
 //
-// 予算の決め方は 2 通り:
-//   auto   : 固定収入合計 - 固定費合計  (例: 250,000 - 170,000 = 80,000)
-//   manual : ユーザーが直接指定した金額
-// どちらの場合も、その月だけ上書きしたい場合は Budget レコードが最優先。
+//   今月あと使えるお金 = 固定収入合計 − 固定費合計 − 今月の使用額
 //
 // 「使用額」には固定費由来の支出を含めない。
-// 予算はすでに固定費を差し引いた「自由に使えるお金」なので、
-// 家賃をここから引くと二重に引くことになるため。
+// 固定収入 − 固定費 の時点で固定費は差し引かれているので、
+// 家賃の支払いをここから引くと二重に引くことになるため。
 // ============================================================================
 
 /** 毎週◯円 → 1ヶ月あたりに換算（×52/12） */
@@ -47,24 +37,12 @@ export function totalFixedIncomes(fixedIncomes: FixedIncome[]): number {
     .reduce((sum, i) => sum + toMonthly(i.amount, i.freq), 0);
 }
 
-/** 指定月の予算額を求める */
-export function getBudgetForMonth(
-  month: string,
-  settings: Settings,
-  budgets: Budget[],
-  fixedExpenses: FixedExpense[],
+/** 今月あと使えるお金の元になる「固定収入 − 固定費」（マイナスにはしない） */
+export function getFreeToSpend(
   fixedIncomes: FixedIncome[],
+  fixedExpenses: FixedExpense[],
 ): number {
-  const override = budgets.find((b) => b.month === month);
-  if (override) return override.amount;
-
-  if (settings.budgetMode === 'auto') {
-    return Math.max(
-      0,
-      totalFixedIncomes(fixedIncomes) - totalFixedExpenses(fixedExpenses),
-    );
-  }
-  return settings.defaultBudget;
+  return Math.max(0, totalFixedIncomes(fixedIncomes) - totalFixedExpenses(fixedExpenses));
 }
 
 /** その支出が「今月あと使える金額」から引かれるか */
@@ -90,15 +68,15 @@ export function warningLevelOf(ratio: number): WarningLevel {
 
 export interface MonthSummary {
   month: string;
-  /** 今月の予算 (自由に使えるお金) */
+  /** 今月の自由に使えるお金 = 固定収入 − 固定費 */
   budget: number;
-  /** 今月の使用額 (予算対象のみ。固定費は含まない) */
+  /** 今月の使用額 (固定費由来は含まない) */
   spent: number;
-  /** 今月あと使える金額。マイナスなら予算超過 */
+  /** 今月あと使えるお金。マイナスなら使いすぎ */
   remaining: number;
-  /** 使用率 0-∞ (予算 0 のときは 0) */
+  /** 使用率 0-∞ (budget 0 のときは 0) */
   ratio: number;
-  /** 予算超過額 (超過していなければ 0) */
+  /** 使いすぎ額 (超過していなければ 0) */
   overspend: number;
   warning: WarningLevel;
   /** 今月に計上した固定費の合計 (実際に登録された支出のうち固定費由来) */
@@ -119,13 +97,7 @@ export interface MonthSummary {
 /** 指定月のサマリを作る。ダッシュボード・分析・履歴すべてがこれを使う */
 export function summarizeMonth(data: AppData, month: string): MonthSummary {
   const list = expensesInMonth(data.expenses, month);
-  const budget = getBudgetForMonth(
-    month,
-    data.settings,
-    data.budgets,
-    data.fixedExpenses,
-    data.fixedIncomes,
-  );
+  const budget = getFreeToSpend(data.fixedIncomes, data.fixedExpenses);
 
   let spent = 0;
   let fixedSpent = 0;
@@ -172,7 +144,6 @@ export function summarizeMonth(data: AppData, month: string): MonthSummary {
 export function listMonths(data: AppData, currentMonth: string, minCount = 6): string[] {
   const set = new Set<string>(data.expenses.map((e) => monthOf(e.date)));
   set.add(currentMonth);
-  for (const b of data.budgets) set.add(b.month);
 
   const sorted = [...set].sort((a, b) => b.localeCompare(a));
   if (sorted.length >= minCount) return sorted;

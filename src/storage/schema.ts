@@ -1,7 +1,7 @@
 import type { AppData, Category, FixedExpense, FixedIncome } from '../types';
 
 /** スキーマ変更時にインクリメントし、migrate() に変換処理を足す */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // 明るめのパレット。ドーナツグラフと並べたときに互いに区別できる色を選ぶ
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -16,9 +16,10 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat_medical', name: '医療', color: '#ef5f6b', icon: '💊', order: 8 },
   { id: 'cat_subsc', name: 'サブスク', color: '#19b8a6', icon: '📺', order: 9 },
   { id: 'cat_rent', name: '家賃', color: '#4cb782', icon: '🏠', order: 10 },
-  { id: 'cat_utility', name: '光熱費', color: '#efb041', icon: '💡', order: 11 },
-  { id: 'cat_comm', name: '通信費', color: '#5b9df9', icon: '📱', order: 12 },
-  { id: 'cat_other', name: 'その他', color: '#8fa0b5', icon: '📦', order: 13 },
+  { id: 'cat_insurance', name: '保険', color: '#8b7fd4', icon: '🛡', order: 11 },
+  { id: 'cat_utility', name: '光熱費', color: '#efb041', icon: '💡', order: 12 },
+  { id: 'cat_comm', name: '通信費', color: '#5b9df9', icon: '📱', order: 13 },
+  { id: 'cat_other', name: 'その他', color: '#8fa0b5', icon: '📦', order: 14 },
 ];
 
 /** 未分類の支出が寄せられる先。カテゴリ削除時の受け皿にもなる */
@@ -30,12 +31,9 @@ export function createEmptyData(): AppData {
     expenses: [],
     creditCards: [],
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
-    budgets: [],
     fixedExpenses: [],
     fixedIncomes: [],
     settings: {
-      budgetMode: 'manual',
-      defaultBudget: 80000,
       alerts: { at70: true, at90: true, at100: true },
     },
   };
@@ -49,8 +47,12 @@ export function migrate(raw: unknown): AppData {
   const base = createEmptyData();
   if (!raw || typeof raw !== 'object') return base;
 
-  const d = raw as Partial<AppData>;
-  const legacySettings = (d.settings ?? {}) as Partial<AppData['settings']> & { income?: number };
+  const d = raw as Partial<AppData> & { budgets?: unknown[] };
+  const legacySettings = (d.settings ?? {}) as Partial<AppData['settings']> & {
+    income?: number;
+    budgetMode?: string;
+    defaultBudget?: number;
+  };
 
   // v1 → v2: 固定費に周期(freq)が無ければ「毎月」。固定収入テーブルを新設
   const fixedExpenses: FixedExpense[] = Array.isArray(d.fixedExpenses)
@@ -58,9 +60,7 @@ export function migrate(raw: unknown): AppData {
     : [];
   const fixedIncomes: FixedIncome[] = Array.isArray(d.fixedIncomes) ? d.fixedIncomes : [];
 
-  // v2 → v3: 旧「手取り月収」(settings.income) を「給料」1件の固定収入に移す。
-  // 予算モード auto の意味が「手取り − 固定費」→「固定収入 − 固定費」に変わったため、
-  // これで移行前の予算額が保たれる。
+  // v2 → v3: 旧「手取り月収」(settings.income) を「給料」1件の固定収入に移す
   const legacyIncome = legacySettings.income ?? 0;
   if (legacyIncome > 0 && fixedIncomes.length === 0) {
     fixedIncomes.push({
@@ -73,19 +73,25 @@ export function migrate(raw: unknown): AppData {
     });
   }
 
+  // v3 → v4: 「予算設定」を廃止。budgetMode / defaultBudget / budgets は取り込まない。
+  // 予算は常に「固定収入合計 − 固定費合計」で決まる。
+  const categories: Category[] =
+    Array.isArray(d.categories) && d.categories.length > 0
+      ? (d.categories as Category[]).slice()
+      : base.categories;
+  // v4: 「保険」カテゴリが無ければ家賃と光熱費の間に追加
+  if (!categories.some((c) => c.id === 'cat_insurance')) {
+    categories.push({ id: 'cat_insurance', name: '保険', color: '#8b7fd4', icon: '🛡', order: 10.5 });
+  }
+
   return {
     schemaVersion: SCHEMA_VERSION,
     expenses: Array.isArray(d.expenses) ? d.expenses : [],
     creditCards: Array.isArray(d.creditCards) ? d.creditCards : [],
-    categories:
-      Array.isArray(d.categories) && d.categories.length > 0 ? d.categories : base.categories,
-    budgets: Array.isArray(d.budgets) ? d.budgets : [],
+    categories,
     fixedExpenses,
     fixedIncomes,
-    // income は廃止したので明示的に取り込まない（他フィールドだけ拾う）
     settings: {
-      budgetMode: legacySettings.budgetMode ?? base.settings.budgetMode,
-      defaultBudget: legacySettings.defaultBudget ?? base.settings.defaultBudget,
       alerts: { ...base.settings.alerts, ...(legacySettings.alerts ?? {}) },
       lastPaymentMethod: legacySettings.lastPaymentMethod,
       lastCreditCardId: legacySettings.lastCreditCardId,

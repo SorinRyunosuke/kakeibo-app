@@ -10,7 +10,6 @@ import {
 } from 'react';
 import type {
   AppData,
-  Budget,
   Category,
   CreditCard,
   Expense,
@@ -59,7 +58,6 @@ interface AppContextValue {
   deleteFixedIncome: (id: string) => void;
 
   updateSettings: (patch: Partial<Settings>) => void;
-  setBudgetForMonth: (month: string, amount: number | null) => void;
 
   replaceAll: (next: AppData) => void;
   resetAll: () => void;
@@ -235,19 +233,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteFixedIncome: (id) =>
         patchData((d) => ({ ...d, fixedIncomes: d.fixedIncomes.filter((i) => i.id !== id) })),
 
-      // --- 設定・予算 -----------------------------------------------------
+      // --- 設定 ---------------------------------------------------------
       updateSettings: (patch) =>
         patchData((d) => ({ ...d, settings: { ...d.settings, ...patch } })),
-
-      /** amount に null を渡すとその月の上書きを解除する */
-      setBudgetForMonth: (month, amount) =>
-        patchData((d) => {
-          const rest = d.budgets.filter((b) => b.month !== month);
-          if (amount === null) return { ...d, budgets: rest };
-          const existing = d.budgets.find((b) => b.month === month);
-          const budget: Budget = { id: existing?.id ?? createId('bdg'), month, amount };
-          return { ...d, budgets: [...rest, budget] };
-        }),
 
       // --- 一括操作 -------------------------------------------------------
       replaceAll: (next) => setData(next),

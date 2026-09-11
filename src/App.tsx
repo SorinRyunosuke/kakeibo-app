@@ -9,7 +9,6 @@ import { More, type MorePage } from './screens/More';
 import { ExpenseForm } from './screens/ExpenseForm';
 import { MonthlyHistory } from './screens/MonthlyHistory';
 import { CardDetail } from './screens/CardDetail';
-import { BudgetPage } from './screens/settings/BudgetPage';
 import { CardPage } from './screens/settings/CardPage';
 import { CategoryPage } from './screens/settings/CategoryPage';
 import { FixedExpensePage } from './screens/settings/FixedExpensePage';
@@ -78,7 +77,7 @@ function Shell() {
               onEditExpense={editExpense}
               onOpenExpenses={() => goTab('expenses')}
               onOpenAnalytics={() => goTab('analytics')}
-              onOpenBudget={() => push({ name: 'budget' })}
+              onOpenIncome={() => push({ name: 'income' })}
               onOpenCards={() => push({ name: 'cards' })}
             />
           )}
@@ -146,8 +145,6 @@ function SubPage({
   onPush: (p: Page) => void;
 }) {
   switch (page.name) {
-    case 'budget':
-      return <BudgetPage onBack={onBack} />;
     case 'fixed':
       return <FixedExpensePage onBack={onBack} />;
     case 'income':
