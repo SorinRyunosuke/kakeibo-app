@@ -130,7 +130,7 @@ describe('予算 = 固定収入 - 固定費', () => {
   });
 });
 
-describe('今月あと使えるお金にカードの引き落としも入れる', () => {
+describe('今月あと使えるお金は現金主義（クレジットは引き落とし日で計算する）', () => {
   it('先月使ったカード利用分が今月引き落としなら、今月の「あと使えるお金」から引かれる', () => {
     const data = createEmptyData();
     data.fixedIncomes = [
@@ -144,12 +144,38 @@ describe('今月あと使えるお金にカードの引き落としも入れる'
       { id: 'e1', amount: 30000, date: '2026-08-20', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
     ];
     const s = summarizeMonth(data, '2026-09');
-    expect(s.spent).toBe(0); // 8月の支出なので9月の使用額には入らない
+    expect(s.spent).toBe(0); // 8月の支出なので9月の「使用額(発生ベース)」には入らない
+    expect(s.nonCreditSpent).toBe(0);
     expect(s.cardPaymentDue).toBe(30000);
     expect(s.remaining).toBe(250000 - 30000);
   });
 
-  it('今月使って今月引き落としのカード（同月精算）は二重計上しない', () => {
+  it('クレジット払いは使った月ではなく引き落とし月にだけ「あと使えるお金」を減らす（月をまたいだ二重計上を防ぐ）', () => {
+    const data = createEmptyData();
+    data.fixedIncomes = [
+      { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
+    ];
+    data.creditCards = [
+      { id: 'c1', name: 'カード', closingDay: 99, paymentDay: 10, paymentMonthOffset: 1, color: '#000' },
+    ];
+    // 9/20に使う -> 9/30締め -> 10/10引き落とし
+    data.expenses = [
+      { id: 'e1', amount: 30000, date: '2026-09-20', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
+    ];
+    const sep = summarizeMonth(data, '2026-09');
+    // 使った月（9月）はまだ口座からお金が出ていないので、あと使えるお金は減らない
+    expect(sep.spent).toBe(30000); // 「今月何に使ったか」の集計にはクレジットも入る（発生ベース）
+    expect(sep.cardPaymentDue).toBe(0);
+    expect(sep.remaining).toBe(250000);
+
+    const oct = summarizeMonth(data, '2026-10');
+    // 引き落とし月（10月）に、実際に口座から出ていく分として1回だけ反映される
+    expect(oct.spent).toBe(0);
+    expect(oct.cardPaymentDue).toBe(30000);
+    expect(oct.remaining).toBe(250000 - 30000);
+  });
+
+  it('同月精算のカード（締め日が早い）も引き落とし日ベースで「あと使えるお金」から引かれる', () => {
     const data = createEmptyData();
     data.fixedIncomes = [
       { id: 'i1', name: '給料', amount: 250000, freq: 'monthly', paymentDay: 25, active: true },
@@ -162,8 +188,9 @@ describe('今月あと使えるお金にカードの引き落としも入れる'
       { id: 'e1', amount: 10000, date: '2026-09-03', categoryId: 'cat_food', paymentMethod: 'credit', creditCardId: 'c1', createdAt: '' },
     ];
     const s = summarizeMonth(data, '2026-09');
-    expect(s.spent).toBe(10000); // 使用額としてすでに計上
-    expect(s.cardPaymentDue).toBe(0); // 引き落とし側では二重に引かない
+    expect(s.spent).toBe(10000); // 発生ベースの使用額としては計上される
+    expect(s.nonCreditSpent).toBe(0); // あと使えるお金の計算には使用額側からは入らない
+    expect(s.cardPaymentDue).toBe(10000); // 引き落とし日ベースで1回だけ反映
     expect(s.remaining).toBe(250000 - 10000);
   });
 

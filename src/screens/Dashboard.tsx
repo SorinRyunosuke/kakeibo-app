@@ -144,7 +144,8 @@ export function Dashboard({
         <p className="hero-label">今月あと使えるお金</p>
         <p className="hero-amount">{yen(summary.remaining)}</p>
         <p className="hero-sub">
-          固定収入 {yen(incomeTotal)} − 固定費 {yen(fixedTotal)} − 使用額 {yen(summary.spent)}
+          固定収入 {yen(incomeTotal)} − 固定費 {yen(fixedTotal)} − 現金等の支出{' '}
+          {yen(summary.nonCreditSpent)}
           {summary.cardPaymentDue > 0 && <> − カード引き落とし {yen(summary.cardPaymentDue)}</>}
         </p>
         <div className="hero-bar">

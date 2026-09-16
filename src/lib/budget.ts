@@ -8,15 +8,23 @@ import { buildBillingCycles } from './creditCard';
 // このアプリでいちばん大事な数字「今月あといくら使えるか」を出す。
 //
 //   今月あと使えるお金
-//     = 固定収入合計 − 固定費合計 − 今月の使用額 − 今月引き落とされるカード請求
+//     = 固定収入合計 − 固定費合計 − 現金/口座払いの使用額 − 今月引き落とされるカード請求
 //
 // 「使用額」には固定費由来の支出を含めない。
 // 固定収入 − 固定費 の時点で固定費は差し引かれているので、
 // 家賃の支払いをここから引くと二重に引くことになるため。
 //
-// 「今月引き落とされるカード請求」は、過去の月に使ったぶんの引き落としだけを
-// 対象にする。今月使った分（= すでに「今月の使用額」に入っている）まで
-// 足すと二重計上になるため、請求サイクルの中身を利用日で振り分けて除く。
+// クレジット払いは「使った日」ではなく「引き落とし日」で家計から引く（現金主義）。
+// カードで買った瞬間はまだ口座からお金が出ていないので、その場では
+// 「あと使えるお金」を減らさず、実際に引き落とされる月にだけ全額を反映する。
+// （以前は使った月にも即減算していたが、これだと同じ支出が「使った月」と
+// 「引き落とし月」の両方で「あと使えるお金」を削ってしまい、実際の現金の
+// 動き以上に2重にマイナスになっていた。）
+//
+// なお「今月の使用額(spent)」「カテゴリ別内訳」などは、これとは別の
+// 「今月何にいくら使ったか」という発生ベースの集計として、クレジット払いも
+// 含めたまま残す。「あと使えるお金」と「今月の使用額」が一致しないのは、
+// 目的の違う2つの数字だからで、意図した仕様。
 // ============================================================================
 
 /** 毎週◯円 → 1ヶ月あたりに換算（×52/12） */
@@ -62,10 +70,9 @@ export function expensesInMonth(expenses: Expense[], month: string): Expense[] {
 }
 
 /**
- * 指定月に口座から引き落とされるカード請求のうち、まだ「今月の使用額」に
- * 含まれていない分（= 過去の月に使って、今月引き落とされる分）を返す。
- * 同じ月内で使って同じ月内に引き落とされるカード（締め日が早いカード等）は
- * 使用額側ですでに数えているので、ここでは除いて二重計上を防ぐ。
+ * 指定月に口座から引き落とされるカード請求の合計。
+ * クレジット払いは「あと使えるお金」からは使用額として引かず、ここでだけ
+ * （実際に引き落とされる月に）全額を反映するので、使用日は問わず全部足す。
  */
 export function cardPaymentDueThisMonth(
   cards: CreditCard[],
@@ -76,10 +83,7 @@ export function cardPaymentDueThisMonth(
   for (const card of cards) {
     if (card.archived) continue;
     for (const cycle of buildBillingCycles(card, expenses)) {
-      if (monthOf(cycle.paymentDate) !== month) continue;
-      for (const e of cycle.expenses) {
-        if (monthOf(e.date) !== month) total += e.amount;
-      }
+      if (monthOf(cycle.paymentDate) === month) total += cycle.amount;
     }
   }
   return total;
@@ -100,11 +104,13 @@ export interface MonthSummary {
   month: string;
   /** 今月の自由に使えるお金 = 固定収入 − 固定費 */
   budget: number;
-  /** 今月の使用額 (固定費由来は含まない) */
+  /** 今月の使用額 (固定費由来は含まない・発生ベースでクレジット払いも含む) */
   spent: number;
-  /** 今月引き落とされるカード請求のうち、過去月に使った分（使用額と二重計上しない） */
+  /** spent のうちクレジット払いを除いた分。「あと使えるお金」の計算はこちらを使う */
+  nonCreditSpent: number;
+  /** 今月引き落とされるカード請求の合計（クレジット払いは使用額側では引かず、こちらだけで計算する） */
   cardPaymentDue: number;
-  /** 今月あと使えるお金。マイナスなら使いすぎ */
+  /** 今月あと使えるお金。マイナスなら使いすぎ。クレジットは引き落とし日で計算する現金主義 */
   remaining: number;
   /** 使用率 0-∞ (budget 0 のときは 0) */
   ratio: number;
@@ -132,6 +138,8 @@ export function summarizeMonth(data: AppData, month: string): MonthSummary {
   const budget = getFreeToSpend(data.fixedIncomes, data.fixedExpenses);
 
   let spent = 0;
+  // 「あと使えるお金」の計算だけに使う。クレジット払いは含めない（引き落とし日で別に計算するため）
+  let nonCreditSpent = 0;
   let fixedSpent = 0;
   let creditUsed = 0;
   let cashUsed = 0;
@@ -139,8 +147,12 @@ export function summarizeMonth(data: AppData, month: string): MonthSummary {
   const categoryMap = new Map<string, number>();
 
   for (const e of list) {
-    if (countsTowardBudget(e)) spent += e.amount;
-    else fixedSpent += e.amount;
+    if (countsTowardBudget(e)) {
+      spent += e.amount;
+      if (e.paymentMethod !== 'credit') nonCreditSpent += e.amount;
+    } else {
+      fixedSpent += e.amount;
+    }
 
     byPaymentMethod[e.paymentMethod] = (byPaymentMethod[e.paymentMethod] ?? 0) + e.amount;
     if (e.paymentMethod === 'credit') creditUsed += e.amount;
@@ -150,13 +162,14 @@ export function summarizeMonth(data: AppData, month: string): MonthSummary {
   }
 
   const cardPaymentDue = cardPaymentDueThisMonth(data.creditCards, data.expenses, month);
-  const remaining = budget - spent - cardPaymentDue;
-  const ratio = budget > 0 ? (spent + cardPaymentDue) / budget : 0;
+  const remaining = budget - nonCreditSpent - cardPaymentDue;
+  const ratio = budget > 0 ? (nonCreditSpent + cardPaymentDue) / budget : 0;
 
   return {
     month,
     budget,
     spent,
+    nonCreditSpent,
     cardPaymentDue,
     remaining,
     ratio,
